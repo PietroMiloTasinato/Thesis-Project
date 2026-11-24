@@ -1,6 +1,6 @@
 # Thesis-Project
 
-Project for the Master Thesis on Computer Engineering with University of Bologna
+Project for the Master Thesis on Computer Engineering with University of Bologna, Italy.
 
 # Project Structure: 
 
