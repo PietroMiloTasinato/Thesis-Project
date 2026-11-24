@@ -1,0 +1,1370 @@
+{
+  "source": "p2305.04847v2.pdf",
+  "title": null,
+  "num_pages": 21,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": null,
+      "text": "Prepared for submission to JINST"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "Erik Buhmann,𝑎Sascha Diefenbacher,𝑎,𝑏Engin Eren,𝑐Frank Gaede,𝑐,𝑑Gregor Kasicezka,𝑎,𝑑Anatolii Korol,𝑐,1 William Korcari,𝑎Katja Krüger𝑐and Peter McKeown𝑐 𝑎Institut für Experimentalphysik, Universität Hamburg,"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "Luruper Chaussee 149, 22607 Hamburg, Germany 𝑏Physics Division, Lawrence Berkeley National Laboratory,"
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "1 Cyclotron Rd, Berkeley, CA 94720, USA 𝑐Deutsches Elektronen-Synchrotron DESY,"
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "Notkestr. 85, 22607 Hamburg, Germany 𝑑Center for Data and Computing in Natural Sciences CDCS, Deutsches Elektronen-Synchrotron DESY,"
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "Notkestr. 85, 22607 Hamburg, Germany"
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "E-mail: anatolii.korol@desy.de"
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "Abstract: Simulating showers of particles in highly-granular detectors is a key frontier in the application of machine learning to particle physics. Achieving high accuracy and speed with generative machine learning models would enable them to augment traditional simulations and alleviate a major computing constraint. This work achieves a major breakthrough in this task by, for the first time, directly generating a point cloud of a few thousand space points with energy depositions in the detector in 3D space without relying on a fixed-grid structure. This is made possible by two key innovations: i) Using recent improvements in generative modeling we apply a diffusion model to generate photon showers as high-cardinality point clouds. ii) These point clouds of up to 6, 000 space points are largely geometry-independent as they are down-sampled from initial even higher-resolution point clouds of up to 40, 000 so-called Geant4 steps. We showcase the performance of this approach using the specific example of simulating photon showers in the planned electromagnetic calorimeter of the International Large Detector (ILD) and achieve overall good modeling of physically relevant distributions."
+    },
+    {
+      "id": 9,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "Keywords: Calorimeter methods; Analysis and statistical methods; Simulation methods and programs"
+    },
+    {
+      "id": 10,
+      "page": 1,
+      "section": "CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation",
+      "text": "ArXiv ePrint: 2305.04847"
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "2 Data Samples 2",
+      "text": "3 Model 6 3.1 Diffusion Point Cloud Generator 6 3.2 Encoder & Latent Flow 8 3.3 Shower Flow & Post-Diffusion Calibration 10"
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "2 Data Samples 2",
+      "text": "4 Results 11 4.1 Physics Performance 11 4.2 Shower Translation 11 4.3 Timing 12"
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "Large-scale experiments in high energy physics (HEP) have one unifying feature: the need to record and analyze an ever-increasing amount of data produced primarily through higher collider luminosities and higher granularity detectors with growing numbers of readout channels. The reduced experimental uncertainty that comes with this increased amount of higher-resolution measurement data presents one of the most promising avenues to increase the precision of measurements and the sensitivity of searches for new physical phenomena beyond the Standard Model."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "In order to compare experimental measurement and theoretical prediction, modern HEP experiments rely on high-precision Monte Carlo (MC) simulations. These simulations model collider events from the initial hard scattering, over hadronization, to the detailed responses of the tracking-, calorimeter-, and muon-systems of the detector. Such detailed modeling is a highly resourceintensive process. Further, for subsequent comparison to collision data to be valid, the number of simulated events has to at least equal the number of recorded collisions. The combination of these two factors means that MC simulation alone places a significant strain on the available HEP computing resources, which, for future high-luminosity experiments, is only bound to increase further [1, 2]."
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "The most notable bottleneck within the MC simulation chain is the step that has to deal with a large number of particles interacting with complex detectors — shower simulation — as the modeling of all involved particles is inherently time-consuming [3]. This provides a strong incentive to find new ways of speeding up MC simulations. One of the most promising current fast simulation approaches is provided by generative machine learning (ML) models. These models can learn an underlying distribution from a given data set and can subsequently be used to generate new data from the learned distribution, allowing them to generate simulated data potentially orders of magnitude faster than classical simulations."
+    },
+    {
+      "id": 16,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "The concept of generative calorimeter simulation is well-proven at this point. Its underlying mathematical viability has been demonstrated [4, 5] and direct applications have been shown using generative adversarial networks [6–15], autoencoder-variants [16–18], normalizing flows [19– 21] and diffusion models [22–24]. They have been successfully deployed e.g. by the ATLAS collaboration [25]."
+    },
+    {
+      "id": 17,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "Previous generative calorimeter models were influenced by machine learning models used in computer vision for image generation, therefore focused on fixed geometrical structures, either in the form of 3-dimensional tensors that mirror the design of a calorimeter or in the form of an ordered list, that connects one output to one calorimeter cell. Within the fixed-structure framework, applications have started out using comparatively simplistic calorimeter geometries and gradually moved to higher and higher detector granularity. This directly follows the advances in calorimeter development, which similarly aim for increasingly granular detectors [26, 27]."
+    },
+    {
+      "id": 18,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "It is, however, this move to higher granularity, that presents the largest challenge for fixedstructure generative models, as higher data dimensionality entails more resource-intensive generation. Most notably, the increased sparsity of highly granular detector data means a large fraction of the model evaluation is wasted on empty cells. In an ideal scenario, this wasted computation could be avoided and only the non-empty sections of the calorimeter would be simulated."
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "To overcome this issue, we introduce CaloClouds, a generative shower simulation approach that does not rely on a fixed structure, but instead generates geometry-independent point clouds. 1 This approach removes the need to simulate empty detector regions. Further, the produced point clouds can be directly projected into an arbitrary detector geometry, thereby allowing for effortless translation invariance and making the handling of e.g. non-regular grids or hexagonal structures straightforward."
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "Point cloud-based generative models have previously been explored in HEP, most notably for fast hadronization simulation [24, 28, 29], however, this work is the first to successfully expand this technique to handle the significantly larger point clouds of several thousand space points required for realistic calorimeter simulations."
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "In the following, we describe the data in Section 2, introduce the model in Section 3, show results in Section 4, and offer conclusions in Section 5."
+    },
+    {
+      "id": 22,
+      "page": 3,
+      "section": "2 Data Samples",
+      "text": "We investigate the performance of our generative point cloud model with a purpose-built dataset that describes the energy depositions of photon showers in the electromagnetic calorimeter (ECAL) of the International Large Detector (ILD) [30]. The calorimeter data training set consists of 524k 2 photon showers, with incident energy uniformly distributed between 10 GeV and 90 GeV, simulated"
+    },
+    {
+      "id": 23,
+      "page": 3,
+      "section": "2 Data Samples",
+      "text": "1The code is available at https://github.com/FLC-QU-hep/CaloClouds. 2The training data is available at https://zenodo.org/records/10044175."
+    },
+    {
+      "id": 24,
+      "page": 4,
+      "section": "2 Data Samples",
+      "text": "in the ECAL of the ILD. The ILD ECAL is a highly granular sampling calorimeter, consisting of 30 layers with alternating passive tungsten absorbers and active silicon sensors. The first (as encountered by the shower) 20 absorber layers have a thickness of 2.1 mm, while the last 10 absorbers have a thickness of 4.2 mm. Every silicon layer has a thickness of 0.5 mm and subdivided into 5 mm × 5 mm cells, which are read out individually. The showers are simulated using Geant4 Version 10.4 (with QGSP BERT physics list) in a detailed simulation model of the ILD detector implemented in the iLCSoft [31] framework. In the case of the ILD ECAL, the model implemented in DD4hep [32] includes realistic gaps between silicon sensors and staggering between layers, such that the cells form an irregular (position-dependent) grid in 3D space. In order to describe the showers, we introduce two coordinate systems: a compact area near the photon’s impact position within the calorimeter is denoted by the coordinates [𝑋,𝑌, 𝑍], with 𝑋and 𝑌pointing parallel to the orientation of the calorimeter layers and 𝑍pointing perpendicular to the calorimeter layers into the detector along the direction of the shower propagation and the [𝑋′,𝑌′, 𝑍′] coordinates that constitute the global coordinate system used in ILD, with 𝑍′ pointing parallel to the beam pipe, 𝑋′ laying in the horizontal plane and 𝑌′ pointing vertically upwards."
+    },
+    {
+      "id": 25,
+      "page": 4,
+      "section": "2 Data Samples",
+      "text": "The simulated photons are produced at [𝑋′ = 0,𝑌′ = 1811.3 mm, 𝑍′ = 40 mm] with a trajectory along 𝑌′, i.e. they are created right at the front of the calorimeter in order to avoid interactions before entering the calorimeter, as well as being positioned so as to avoid cracks in the detector."
+    },
+    {
+      "id": 26,
+      "page": 4,
+      "section": "2 Data Samples",
+      "text": "During the full simulation with Geant4, a very large number of individual energy depositions (on average 20,000 per shower) from secondary particles traversing the sensors is created in the sensitive materials and then added up in the actual calorimeter cells of 5 mm × 5 mm transversal size. While in principle these steps3 could be used as input to the point cloud model, their number is prohibitively large, and therefore a pre-clustering procedure is applied before the actual training. However, this clustering still needs to be more granular than the physical cell size to allow a shower projection into any part of the calorimeter (except changing its depth) without introducing reconstruction artefacts due to cell staggering and gaps."
+    },
+    {
+      "id": 27,
+      "page": 4,
+      "section": "2 Data Samples",
+      "text": "For this pre-clustering procedure, the steps are grouped by their layer number and then projected into a regular grid with a 36 times higher granularity than that of the actual calorimeter, i.e. into grid cells of 0.83 mm × 0.83 mm transversal size, thereby reducing the total number of space points by a factor of circa 7. The effects of this clustering are largely negligible when considering complete showers, as is shown in detail in A. Note, that only active steps are simulated, maintaining the main advantage of point cloud-based simulation."
+    },
+    {
+      "id": 28,
+      "page": 4,
+      "section": "2 Data Samples",
+      "text": "In order to normalize the range of inputs to the model, we define a bounding box around the showers. This box extends from −200 mm to 200 mm in 𝑋and 𝑌around the fixed impact point and spans across all layers, making it around seven times more voluminous than what was used in previous ILD ECAL photon shower data sets [16]. Any clusters that still end up outside the bounding box — less than 4 per mille — are discarded. Finally, as there can be no recorded hits in the absorber layers, the data is transformed such that the absorber regions are removed and the active layers become contiguous. Furthermore, the 𝑍positions within the active layers are uniformly smeared within a layer to produce data that is smooth in 𝑍, whereas in the ILD simulation, the"
+    },
+    {
+      "id": 29,
+      "page": 4,
+      "section": "2 Data Samples",
+      "text": "3Following the standard Geant4 [33] terminology."
+    },
+    {
+      "id": 30,
+      "page": 5,
+      "section": "2 Data Samples",
+      "text": "energy is deposited for purely technical reasons predominantly at the center of a layer. The cluster positions are then normalized such that the opposing boundaries of the bounding box correspond to a position of −1 and 1 respectively. Figure 1 presents an overview of the data preprocessing pipeline."
+    },
+    {
+      "id": 31,
+      "page": 5,
+      "section": "2 Data Samples",
+      "text": "Figure 1: Illustration of the data preprocessing pipeline."
+    },
+    {
+      "id": 32,
+      "page": 5,
+      "section": "2 Data Samples",
+      "text": "In addition to the training data, two validation data sets and one test set were simulated. The two validation data sets were simulated at the same position as the training data, the first containing 40k samples with energies uniformly distributed between 10 GeV and 90 GeV, and the second consisting of fixed energy photon showers with incident particle energies of 10 GeV, 50 GeV, and 90 GeV. Each set with fixed energy contains 2k showers, totaling 6k data samples. Finally, the test set contains 2k samples with fixed incident particle energy of 50 GeV that differs in the position at which the photons were simulated. The validation sets have the photons produced at"
+    },
+    {
+      "id": 33,
+      "page": 5,
+      "section": "2 Data Samples",
+      "text": "[𝑋′ = 0,𝑌′ = 1811.3 mm, 𝑍′ = 40 mm], matching the training data, while the test set places the origin of the photons at [𝑋′ = 37.5 mm,𝑌′ = 1811.3 mm, 𝑍′ = −36.1 mm]. This allows us to investigate the behavior of the generated point clouds under a translation to another position in the points / shower Note"
+    },
+    {
+      "id": 34,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "All Geant4 steps 40 000 Initial output of Geant4 Clustered Geant4 steps 6 000 Input/output of CaloClouds Hits in calorimeter grid 1 000 Calculation of physics observables"
+    },
+    {
+      "id": 35,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Table 1: Overview of the three different types of point clouds considered in this work, indicating their role. Note that the number of points per shower (second column) only provides an order of magnitude."
+    },
+    {
+      "id": 36,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Data t E N"
+    },
+    {
+      "id": 37,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "EPiC Encoder z"
+    },
+    {
+      "id": 38,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Noise"
+    },
+    {
+      "id": 39,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "PointWise"
+    },
+    {
+      "id": 40,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Net"
+    },
+    {
+      "id": 41,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Predicted Noise"
+    },
+    {
+      "id": 42,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "(a) Training at random time step 𝑡"
+    },
+    {
+      "id": 43,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Esum, Nz,i Generated Shower Calibration"
+    },
+    {
+      "id": 44,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Latent"
+    },
+    {
+      "id": 45,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "E Shower"
+    },
+    {
+      "id": 46,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "PointWise steps T N"
+    },
+    {
+      "id": 47,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Flow diﬀusion"
+    },
+    {
+      "id": 48,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Flow z"
+    },
+    {
+      "id": 49,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Net"
+    },
+    {
+      "id": 50,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Noise"
+    },
+    {
+      "id": 51,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "(b) Sampling with reverse diffusion through all time steps 𝑇"
+    },
+    {
+      "id": 52,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Figure 2: Illustration of the training and sampling procedure of the CaloClouds architecture. The separate training of the Shower Flow and the Latent Flow is not shown."
+    },
+    {
+      "id": 53,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "calorimeter, where the local cell geometry is different (see Section 4.2)."
+    },
+    {
+      "id": 54,
+      "page": 6,
+      "section": "2 Data Samples",
+      "text": "Finally, Table 1 provides an overview of the types of point clouds considered in this work."
+    },
+    {
+      "id": 55,
+      "page": 7,
+      "section": "3 Model",
+      "text": "Point cloud generative models take a given number of random noise points and transform them into a point cloud of the desired shape (potentially with additional point features as in our case). This makes producing clouds with a variable number of points inherently challenging. To address this cardinality issue, we employ a two-step approach during model training and a three-step approach during sampling, drawing inspiration from Ref. [34]. In the following, we first briefly outline the overall structure with additional details provided in corresponding subsections. An illustration of the training and sampling procedure is shown in Figure 2."
+    },
+    {
+      "id": 56,
+      "page": 7,
+      "section": "3 Model",
+      "text": "During training, the original data is first encoded with a Variational-Autencoder (VAE)-like EPiC Encoder, conditioned on the incident particle energy and the number of points, into a near- Gaussian distributed latent space. Second, this latent space, together with the incident energy and number of points, is used in a conditional point cloud diffusion model termed PointWise Net."
+    },
+    {
+      "id": 57,
+      "page": 7,
+      "section": "3 Model",
+      "text": "During sampling, the encoded latent space is generated with a conditional Latent Flow model. Since this Latent Flow needs to be conditioned on the incident energy and the number of points, a second Shower Flow is employed during sampling to generate an appropriate number of points from a requested incident energy. This way, the only conditional variable for the whole model is the particle incident energy 𝐸. Additionally, the Shower Flow generates the total visible energy of the calorimeter point cloud 𝐸sum as well as the number of points per layer 𝑁𝑧,𝑖for a post-diffusion calibration of the generated point cloud."
+    },
+    {
+      "id": 58,
+      "page": 7,
+      "section": "3 Model",
+      "text": "In Section 3.1 we discuss first the PointWise Net at the core of the overall proposed CaloClouds architecture. Then, in Section 3.2, we introduce the EPiC Encoder used during training and the Latent Flow used to perform sampling. Finally, in Section 3.3 we outline the Shower Flow used to generate the conditioning variables as well as calibration factors."
+    },
+    {
+      "id": 59,
+      "page": 7,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "The main part of the CaloClouds architecture is the PointWise Net which is trained as a diffusion probabilistic model and was introduced in Ref. [34]. In general, diffusion models [35] learn a Markov chain of Gaussian distortions that over 𝑇time steps diffuse data to noise. Here the data is a point cloud 𝑋(0) = {𝒙(0) 𝑖=1 comprised of 𝑁points with the exponent in parentheses denoting the time step."
+    },
+    {
+      "id": 60,
+      "page": 7,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "During training, a forward diffusion process for every point is modeled as a Markov chain:"
+    },
+    {
+      "id": 61,
+      "page": 7,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "for time steps 𝑡∈1, . . . ,𝑇, N denoting the normal distribution, and variance schedule 𝛽1 · · · 𝛽𝑇 controlling the diffusion process. To generate realistic point clouds from a simple noise distribution, the reverse diffusion process starting from noise 𝑝(𝒙(𝑇) 𝑖 ) = N (0, 𝑰) is defined as:"
+    },
+    {
+      "id": 62,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "E N t z"
+    },
+    {
+      "id": 63,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "(a) PointWise Net"
+    },
+    {
+      "id": 64,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "(b) ConcatSquash Layer (CSL)"
+    },
+    {
+      "id": 65,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "Figure 3: Illustration of the CaloClouds’ PointWise Net (a) consisting of multiple ConcatSquash layers (b). The number of hidden dimensions is indicated. MLP denotes a multi-layer perceptron. ∗No activation function is applied in the last layer of the PointWise Net."
+    },
+    {
+      "id": 66,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "where the estimated mean 𝝁𝜽is modeled by a neural network with parameters 𝜃and the generation process is steered by a conditioning latent vector 𝒛. This latent variable is crucial as the generated point cloud needs to have consistent global properties, i.e. realistic energy and center of gravity. As all initial noise points 𝑋(𝑇) = 𝒙(𝑇) 𝑖=1 are sampled identical and independently distributed (i.i.d.), the latent 𝒛is the only source of shared information for the generated point cloud 𝑋(0)."
+    },
+    {
+      "id": 67,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "For practical training, Ref. [36] showed that 𝒙(𝑡) 𝑖 can be sampled directly from data 𝒙(0) 𝑖 without going through all previous steps:"
+    },
+    {
+      "id": 68,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "𝑠=1 𝛼𝑠. This allows parameterising 𝒙(𝑡) with notation 𝛼𝑡:= 1 −𝛽𝑡and 𝛼𝑡:= Î𝑡"
+    },
+    {
+      "id": 69,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "1 −𝛼𝑡𝜖with noise 𝜖∼N (0, 𝑰). The model approximating the mean 𝝁𝜽can be parameterized as:"
+    },
+    {
+      "id": 70,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "𝑖 , 𝑡, 𝒛) is a neural network which predicts 𝝐from 𝒙(𝑡) 𝑖 . Hence, the model 𝝁𝜽was rephrased as a noise predictor 𝝐𝜽which can be optimized with a simple L2 loss:"
+    },
+    {
+      "id": 71,
+      "page": 8,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "Therefore the diffusion loss for the full pointcloudattimestep𝑡isgivenby 𝐿(𝑡−1) 𝑖 . For efficient training, a random time step 𝑡∈1, . . . ,𝑇is chosen at each optimization step. A full derivation of the PointWise Net and its training objective can be found in Ref. [34]. We optimize our model with a total of 𝑇= 100 time steps with a quadratic variance scheduler between 𝛽𝑇= 0.02 and 𝛽1 = 10−4."
+    },
+    {
+      "id": 72,
+      "page": 9,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "The neural network 𝝁𝜽is the same for each point 𝒙(𝑡) 𝑖 ∈𝑋(𝑡), therefore we can sample permutation-equivariant point clouds with a variable number of points 𝑁. Output and input dimensions of the network need to be identical — in our case four (three spatial dimensions and energy). We utilize the same PointWise Net architecture as used in Ref. [34]. An overview of the architecture and the layer structure is shown in Figure 3. It consists of multiple ConcatSquash layers [37] which are conditioned on a global context vector — in this case a concatenated vector of the incident particle energy 𝐸, the number of points 𝑁, the time features 𝑡, and the latent vector 𝒛. The ConcatSquash layers are essentially two-layer fully connected networks, with the first hidden layer aligning the dimensionality of the context conditioning vector with the hidden dimensionality of the layer input. A LeakyReLU activation follows the second hidden layer."
+    },
+    {
+      "id": 73,
+      "page": 9,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "This architecture allows for each point to be sampled independently of all other points of the point cloud. Note that the assumption of i.i.d. sampling of each point of the calorimeter shower is theoretically not optimal as in reality, the photon shower cascade develops through particle interactions. However, due to the simple topological structure of electromagnetic showers, we assume the points to be i.i.d. and gain encouraging generative fidelity with this approach. Since we do not model any particle interactions, the point cloud generation scales O(N) with the number of points, which is crucial since we generate several thousand points per shower. We performed a few early experiments with the equivariant point cloud (EPiC) layers introduced in Ref. [28] as they allow for point interactions with linear computational scaling but did not observe improved performance. This is likely due to the EPiC layers being optimised for much smaller point clouds of O(10) cardinality. Graph network and transformer approaches for point cloud generation such as Ref.[29, 38–42] generally scale O(N2) and are therefore significantly slower than our model. However, fast implementations of attention, graph networks or sequence convolutions [43–46] might be interesting avenues to explore in the future, e.g. for generating hadronic showers including nuclear interactions."
+    },
+    {
+      "id": 74,
+      "page": 9,
+      "section": "3.1 Diffusion Point Cloud Generator",
+      "text": "Figure 4 shows a visualization of the calorimeter point cloud generation at different stages of the reverse diffusion process (i.e. starting with noise)."
+    },
+    {
+      "id": 75,
+      "page": 9,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "The PointWise Net generates point clouds via the reverse diffusion process. For the resulting point clouds to be realistic, PointWise Net needs to be conditioned on additional quantities beyond multiplicity 𝑁and shower energy 𝐸."
+    },
+    {
+      "id": 76,
+      "page": 9,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "In principle, one could add additional physically relevant quantities such as the total visible energy, the center of gravity, or the shower start as explicit conditioning features. However, such a choice of observables might bias the generated showers. Instead, we opt for learning an additional global context vector 𝒛to capture any other relevant distributions via an additional encoder."
+    },
+    {
+      "id": 77,
+      "page": 9,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "This encoding is learned by an Equivariant Point Cloud (EPiC) Encoder using three EPiC layers introduced in Ref. [28] with a hidden dimensionality of 128. The EPiC Encoder is conditioned on 𝐸 and 𝑁and learns to encode the original Geant4 point cloud into two latent space vectors 𝝁and 𝝈. Similar to the encoder in a VAE, 𝝁and 𝝈are regularised towards a Gaussian distribution with the"
+    },
+    {
+      "id": 78,
+      "page": 10,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "Figure 4: Illustration of the reverse diffusion process. Starting from the initial noise. The color scale corresponds to the point energy."
+    },
+    {
+      "id": 79,
+      "page": 10,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "Kullback-Leibler divergence (KLD) loss and the latent space 𝒛is sampled with the reparametrization trick [47]. The KLD loss is given by:"
+    },
+    {
+      "id": 80,
+      "page": 10,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "with the latent variables sampled via 𝒛∼Z = N (𝝁, 𝝈2). We set the size of 𝒛to 256, the default in Ref. [34], without performing a hyperparameter optimisation."
+    },
+    {
+      "id": 81,
+      "page": 10,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "During training, the EPiC Encoder and the point cloud generator are trained in parallel using a combination of 𝐿KLD and the diffusion reconstruction loss. At a randomly sampled time step 𝑡this results in the total loss function:"
+    },
+    {
+      "id": 82,
+      "page": 10,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "total = 𝑤KLD · max(𝐿KLD, 𝑚𝐾𝐿𝐷) + 𝐿(𝑡−1) with the KLD weight 𝑤KLD = 10−3. To prevent a posterior collapse of 𝒛we enforced a minimum KLD loss of 𝑚KLD = 1.0. The EPiC Encoder and the PointWise Net were implemented using PyTorch [48] and trained together for a total of 800k iterations using the Adam [49] optimizer with a learning rate scheduled between 10−3 and 10−4."
+    },
+    {
+      "id": 83,
+      "page": 10,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "During sampling, we generate the encoded latent space 𝒛with a Normalizing Flow model [50] termed Latent Flow. This Latent Flow model is conditioned on 𝐸and 𝑁and consists of ten coupling blocks with monotonic rational-quadratic splines [51] each with two layers, a hidden dimensionality of 128, and LeakyReLU activations. The Latent Flow is trained simultaneously with the EPiC Encoder and the diffusion model via the negative log-likelihood loss but with a separate Adam optimizer and a learning rate scheduler. It was implemented using the nflows package [52]."
+    },
+    {
+      "id": 84,
+      "page": 11,
+      "section": "3.2 Encoder & Latent Flow",
+      "text": "A similar encoding and latent flow strategy are implemented in Ref. [34], however, we choose a more advanced encoder and flow architecture as well as choosing to disentangle the encoder and diffusion loss from the flow training loss to achieve a more flexible optimization regime."
+    },
+    {
+      "id": 85,
+      "page": 11,
+      "section": "3.3 Shower Flow & Post-Diffusion Calibration",
+      "text": "To estimate the number of points 𝑁in a point cloud i.e. 𝑁gen for a requested incident energy 𝐸, we employ a separately trained normalizing flow model, called Shower Flow. This Shower Flow is trained to generate the showers’ total visible energy 𝐸sum and the number of points per calorimeter layer 𝑁𝑧,𝑖for the purpose of post-diffusion calibration. For consistency, the total number of points 𝑁gen is defined by 𝑁gen = Í29"
+    },
+    {
+      "id": 86,
+      "page": 11,
+      "section": "3.3 Shower Flow & Post-Diffusion Calibration",
+      "text": "The Shower Flow consists of ten blocks with seven coupling layers each. Out of these, six are based on affine transformations [53] and one is based on element-wise rational splines [51]. Each coupling layer is conditioned on the incident particle energy 𝐸. This flow was implemented with the Pyro package [54]."
+    },
+    {
+      "id": 87,
+      "page": 11,
+      "section": "3.3 Shower Flow & Post-Diffusion Calibration",
+      "text": "While the number of points 𝑁gen generated by the Shower Flow describes the corresponding Geant4 distribution 𝑁data well, the number of calorimeter hits, i.e. the occupancy 𝑂gen, of the projected point cloud may not necessarily correctly match the corresponding Geant4 distribution 𝑂data. This occurs as the projection of the space points into cells of the detector grid has two possible failure modes: either too many points 𝑁gen are projected into the same calorimeter cell and therefore the number of hits 𝑂gen is lower than the expected 𝑂data, or too few points are projected together leading to an overestimation of 𝑂data. For our model, we observed the latter case since for a given shower the 𝑂gen is up to 10% larger than the 𝑂data. To resolve this mismatch, we introduced an energy-dependent correction factor 𝑐𝑁(𝑁) = 𝑝gen(𝑝data(𝑁))/𝑁. Here, 𝑝data represents a cubic polynomial fit of 𝑁data to 𝑂data, while 𝑝gen corresponds to a cubic polynomial fit of 𝑂gen to 𝑁gen. This correction factor is used to rescale 𝑁gen predicted by the Shower Flow as well as the predicted points per layer 𝑁𝑧,𝑖, resulting in a calibrated number of points 𝑁cal = 𝑐𝑁· 𝑁gen and 𝑁𝑧,𝑖,cal = 𝑐𝑁· 𝑁𝑧,𝑖. The calibrated number of points is then used for sampling from the diffusion model."
+    },
+    {
+      "id": 88,
+      "page": 11,
+      "section": "3.3 Shower Flow & Post-Diffusion Calibration",
+      "text": "Finally, we consider an additional rescaling of the point features following the diffusion models’ generation: The post-diffusion calibration is performed in four steps. First, in case negative point energies were generated, they are set to zero. Second, the total energy of the point cloud is rescaled to match the predicted 𝐸sum. Third, all points are ordered based on their Z-coordinate and then iteratively the first 𝑁𝑧,𝑖=0 points are set to Z-coordinate index 𝑧𝑖= 0, afterward the next 𝑁𝑧,𝑖=1 points are set to coordinate 𝑧𝑖= 1 and so on until layer index 𝑧𝑖= 29. This way, the total energy and the energy distribution in the Z-direction are well calibrated, otherwise both distributions are challenging to model with the diffusion model alone precisely. Fourth, a calibration of the center of gravity in the X- and Y-directions is performed by shifting all X- and Y-coordinates by their mean center of gravity of the training data set."
+    },
+    {
+      "id": 89,
+      "page": 11,
+      "section": "3.3 Shower Flow & Post-Diffusion Calibration",
+      "text": "Overall the CaloClouds model together with these calibrations achieves high fidelity on a number of important shower physics observables as presented in the following section."
+    },
+    {
+      "id": 90,
+      "page": 12,
+      "section": "4 Results",
+      "text": "In the following Section 4.1, we compare the distributions produced by the CaloCloud model to the Geant4 ground-truth for several per-shower variables and global observables. For this, the space points generated with CaloCloud are projected back into the real and irregular grid-like geometry of the cells in the ILD detector model — in the same manner as in the Geant4 simulation. Section 4.2 then demonstrates the model’s ability to generate showers originating from any arbitrary incident point of the particle along the detector surface. Finally, in Section 4.3 we conclude with an investigation of our model’s speed-up in comparison to Geant4 simulation."
+    },
+    {
+      "id": 91,
+      "page": 12,
+      "section": "4.1 Physics Performance",
+      "text": "First, we consider how well the distribution of measured energies across a broad range of incident energies is described after projecting back to the physical coordinate system. Figure 5 (left) shows the per-cell energy distribution. Overall, this is well described by the diffusion model, with the largest differences occurring at regions in the spectrum where the slope changes (i.e. at 0.5 MeV and 100 MeV). Here, the shaded region indicates energies below 0.1 MeV, corresponding to half the energy deposited by a minimally ionizing particle (MIP). As these energies will be dominated by detector noise they are ignored in the reconstruction process and therefore are also not considered when calculating other quantities."
+    },
+    {
+      "id": 92,
+      "page": 12,
+      "section": "4.1 Physics Performance",
+      "text": "The radial shower profile (Figure 5 (center)) and the longitudinal shower profile (Figure 5 (right)) are overall well-learned by the diffusion model with some differences observed at the edges of the distribution."
+    },
+    {
+      "id": 93,
+      "page": 12,
+      "section": "4.1 Physics Performance",
+      "text": "Next, we consider the modeling of the center of the shower in Figure 6. For this, the center of gravity (i.e. the energy-weighted centroid) is calculated per shower along the 𝑋(left), 𝑌(center), and 𝑍(right) direction. The radial directions in 𝑋and 𝑌are well described, with the diffusion model predicting a slightly more peaked distribution in both cases. In the longitudinal direction, the shape is captured correctly by the diffusion model as well, with the peak shifted approximately 10 mm compared to Geant4. To test whether the response for different shower energies is learned correctly, we consider the visible energy (left) and the overall number of hits above the threshold (right) in Figure 7. The distributions are shown for incident energies of 10, 50, and 90 GeV. At all incident energies, the visible energy distributions are very well modeled – an important feature for a calorimeter simulation as it is the width of these distributions that directly determines the energy resolution of the detector. The distributions for the number of hits above the threshold are modeled well with, some deviations visible at higher energies."
+    },
+    {
+      "id": 94,
+      "page": 12,
+      "section": "4.2 Shower Translation",
+      "text": "To test the capability of the CaloClouds architecture to generate photon showers originating from arbitrary incident points on the detector, we compare the model using the two different data sets introduced in Section 2: a validation data set that has been simulated at the same position in the calorimeter as the training data set and a test data set simulated at a different position in the calorimeter. Depending on the exact impact point in the calorimeter the local cell geometry will look different, for example, due to the local staggering of cells between layers, the position of the"
+    },
+    {
+      "id": 95,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "100 102 visible cell energy [MeV]"
+    },
+    {
+      "id": 96,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "Figure 5: Histograms of the cell energies (left), radial shower profile (center), and longitudinal shower profile (right) for both Geant4 and CaloClouds. In the per-cell energy distribution, the region below 0.1 MeV is grayed out (see main text for details). All distributions are calculated for a uniform distribution of incident particle energies."
+    },
+    {
+      "id": 97,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "−2 0 2 4 center of gravity X [mm]"
+    },
+    {
+      "id": 98,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "38 40 42 44 center of gravity Y [mm]"
+    },
+    {
+      "id": 99,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "1900 1950 center of gravity Z [mm]"
+    },
+    {
+      "id": 100,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "Figure 6: Position of the center of gravity of showers along the X (left), Y (center), and Z (right) directions. All distributions are calculated for a uniform distribution of incident particle energies."
+    },
+    {
+      "id": 101,
+      "page": 13,
+      "section": "4.2 Shower Translation",
+      "text": "impact point with respect to the cell centers, gaps in the cell structure at the edge of silicon sensors, etc. The distribution that is most susceptible to potential artifacts resulting from such a translation is the cell energy distribution. This distribution is shown in Figure 8 for the validation (left) and test data set (right) respectively, where in the case of the test data set the generated point cloud has been translated to the new impact position and then projected into the local cell geometry used for the full simulation with Geant4. Both comparisons show equally reasonable agreement between Geant4 and CaloClouds with no visible deterioration for the translated point cloud."
+    },
+    {
+      "id": 102,
+      "page": 13,
+      "section": "4.3 Timing",
+      "text": "The main motivation for simulation using generative models is speeding up the generation time per shower. In Table 2, we present the generation time of CaloClouds in comparison with the baseline Geant4 simulation on either a single CPU core or on a machine equipped with an NVIDIA A100 GPU. The Geant4 baseline time is taken from Ref. [16], which was obtained in an identical detector"
+    },
+    {
+      "id": 103,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "10 GeV"
+    },
+    {
+      "id": 104,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "Geant4 CaloClouds"
+    },
+    {
+      "id": 105,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "50 GeV"
+    },
+    {
+      "id": 106,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "90 GeV"
+    },
+    {
+      "id": 107,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "0 1000 2000 energy sum [MeV]"
+    },
+    {
+      "id": 108,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "10 GeV"
+    },
+    {
+      "id": 109,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "Geant4 CaloClouds"
+    },
+    {
+      "id": 110,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "50 GeV 90 GeV"
+    },
+    {
+      "id": 111,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "500 1000 1500 number of hits"
+    },
+    {
+      "id": 112,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "Figure 7: Visible energy sum (left) and the number of hits (right) distributions, for 10, 50, and 90 GeV showers."
+    },
+    {
+      "id": 113,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "10−2 100 102 visible cell energy [MeV]"
+    },
+    {
+      "id": 114,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "10−2 100 102 visible cell energy [MeV]"
+    },
+    {
+      "id": 115,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "Figure 8: Per-cell energy distribution for the 50 GeV validation (left) data set, created at the same position as the training data set and for a 50 GeV test (right) data set simulated at a different position with the generated point cloud translated to this position."
+    },
+    {
+      "id": 116,
+      "page": 14,
+      "section": "4.3 Timing",
+      "text": "model and sub-detector to that studied here. In all cases, we consider uniform energy distributions with incident particle energies between 10 and 100 GeV. Note that the range of 10 – 100 GeV for timing studies is chosen for consistency with Ref. [16] but exceeds the training range of 10 – 90 GeV used for the CaloClouds model. However, while this might in principle be out-of-distribution for"
+    },
+    {
+      "id": 117,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "Hardware Simulator Time / Shower [ms] Speed-up"
+    },
+    {
+      "id": 118,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "CPU Geant4 4082 ± 170 ×1"
+    },
+    {
+      "id": 119,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "CaloClouds 3509 ± 220 ×1.2"
+    },
+    {
+      "id": 120,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "GPU CaloClouds 38 ± 3 ×107"
+    },
+    {
+      "id": 121,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "Table 2: Comparison of the computational performance of CaloClouds to the baseline Geant4 simulator on a single core of an Intel® Xeon® CPU E5-2640 v4 (CPU) and an NVIDIA® A100 with 40 GB of memory (GPU). Showers were generated with incident energy uniformly distributed between 10 and 100 GeV. The batch size was set to 1 on the CPU and to 64 on the GPU. Values presented are the means and standard deviations over 25 runs. The Geant4 time is taken from Ref. [16]."
+    },
+    {
+      "id": 122,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "modeling the data well, we expect the timing performance to be robust also in extrapolation."
+    },
+    {
+      "id": 123,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "On a single CPU core, the speed-up provided by CaloClouds is about 1.2×, whereas on a GPU the relative speed-up is increased to 107× faster than Geant4."
+    },
+    {
+      "id": 124,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "When sampling, the Shower Flow is evaluated once for all events, followed by batch-wise sampling from the Latent flow and the PointWise Net. Unlike previous image-based fast simulation models such as Ref. [16, 18, 21], the computational cost of the PointWise Net scales O(𝑁) with the number of points and hence with the energy 𝐸just like Geant4. Therefore, to improve overall training and sampling speed, we batch together events with a similar number of points. Overall, the model is trained for 800k iterations on an NVIDIA A100, which takes about 80 hours."
+    },
+    {
+      "id": 125,
+      "page": 15,
+      "section": "4.3 Timing",
+      "text": "Our implementation of PointWise Net uses a 100-step reverse diffusion process for shower generation. This reverse diffusion process is implemented as a computational loop and can therefore not be parallelized. Recent developments investigated how few-step or even single-step generation with diffusion models might be possible, e.g. using consistency distillation [55] or progressive distillation [56], which has been already applied in high-energy physics [23]. Using one of these techniques will likely speed up the generation by at least 10× since the diffusion process in our model is significantly slower than the other components such as the Shower and Latent Flow generation. Since this work is focused on model development, such improvements are left to future work."
+    },
+    {
+      "id": 126,
+      "page": 15,
+      "section": "5 Conclusions",
+      "text": "Motivated by the overarching need of simulating particle showers in complex calorimeter detectors in a time and resource-efficient manner, generative models are widely explored in current particle physics research. A key problem is how to scale up such generators to be able to simulate showers with thousands of particles in high-resolution calorimeter regions. Given the inefficient scaling behavior of fixed-structure approaches, point clouds are an attractive alternative and form the foundation of our proposed strategy."
+    },
+    {
+      "id": 127,
+      "page": 16,
+      "section": "5 Conclusions",
+      "text": "This work makes several contributions to advance the state-of-the-art in this task. At the core of the proposed CaloClouds architecture is the PointWise Net, a permutation invariant, diffusionbased, point cloud generator. It is accompanied by an EPiC Encoder (in the training phase), a Latent Flow (in the sampling phase) to provide realistic conditions, and an additional Shower Flow that learns the visible energy distribution and the number of points per layer."
+    },
+    {
+      "id": 128,
+      "page": 16,
+      "section": "5 Conclusions",
+      "text": "In principle, this combination of four models could already be used to directly simulate a point cloud of calorimeter hits. However, the relatively dense arrangement of hits is difficult to model, with the correct number of hits per volume, in particular, being difficult to learn. Additional difficulties arise from realistic calorimeter cell layouts due to staggering between layers or gaps between sensors, resulting in different local cell topologies in different parts of the calorimeter. In order to circumvent these constraints we, for the first time, move to an even higher-resolution space and consider individual Geant4 steps. While this increases the number of points to simulate by a small integer factor, it yields a distribution that can be more easily learned and subsequently downsampled to the actual resolution of a given calorimeter."
+    },
+    {
+      "id": 129,
+      "page": 16,
+      "section": "5 Conclusions",
+      "text": "Together these two innovations allow us, for the first time, to generate high-cardinality point clouds with unprecedented fidelity in all observed distributions with moderate speed-ups compared to Geant4. In follow-up studies, techniques such as consistency distillation [55] have been proven to significantly increase the sampling speed [57]. Additional comparisons of the CaloClouds model to already established fixed-structure calorimeter generative models, i.e. the BIB-AE [16] and CaloScore [22], we leave to further research. Based on the shown results, these models currently offer higher generative fidelity, yet are geometry-dependent and suffer from the discussed computational inefficiencies. For future research, we plan to improve the CaloClouds diffusion paradigm and the model architecture, taking inter-point correlations into account, to increase the generative fidelity."
+    },
+    {
+      "id": 130,
+      "page": 16,
+      "section": "5 Conclusions",
+      "text": "For scenarios where higher resolution versions of simulations are not available for training (e.g. shower simulations, samples taken from collider data, the ongoing CaloChallenge [58] competition or problems from other domains), it might be possible to generate surrogate high-resolution data by smearing points with an appropriate function. Even so, CaloClouds demonstrates the potential of scaling point cloud simulations with high fidelity to much higher cardinalities, making the realistic simulation of showers at the HL-LHC, the ILC, and beyond a feasible target."
+    },
+    {
+      "id": 131,
+      "page": 16,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "In order to study possible effects of the pre-clustering procedure (see Section 2), we test its closure by applying the procedure to a sample simulated with Geant4 alone and then project the resulting clusters that form the point cloud used in CaloCloud back into the realistic cell geometry of the ILD simulation model. Figure 9 shows this for a typical shower with 90 GeV incident energy in a given layer of the calorimeter (layer 21). The left figure shows the cell energies in this layer as generated during the Geant4 simulation by projecting the energy depositions into the calorimeter cells. The thick black bars are gaps between sensors as they occur in the simulation model of ILD at the chosen impact point. The center plot shows the resulting space points after the projection of the Geant4 steps into the virtual ultra-high granular grid. Finally, the right plot shows the cell energies resulting from simply projecting the space points back into the calorimeter cells. Additionally, the"
+    },
+    {
+      "id": 132,
+      "page": 17,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "Geant4 steps are shown on the left in blue and the clusters on the right in orange. No obvious discrepancies are seen in this example."
+    },
+    {
+      "id": 133,
+      "page": 17,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "Figure 9: Example shower of 90 GeV in one layer of the calorimeter. Left: cell energies as recorded in the ILD simulation model with blue dots representing the Geant4 steps. Center: projection of the steps in the ultra-high granularity grid (pre-clustering). Right: Resulting cell energies after projecting the space points (orange dots) back into the detector cells."
+    },
+    {
+      "id": 134,
+      "page": 17,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "In order to quantify the effects, in Figure 10 we show an overlay of 2,000 showers in the same layer. The left figure shows this overlay as produced by Geant4, while the center plot shows this overlay after a full round trip of pre-clustering and projecting back into the same cell geometry. The right plot shows the resulting relative difference for every cell. The resulting difference is well below 10% for all and below 2% for most cells, indicating good closure. Importantly, most differences occur in sparsely populated parts of the showers where small differences in absolute energies lead to large relative differences. The core, where most of the shower energy is concentrated, is especially well preserved."
+    },
+    {
+      "id": 135,
+      "page": 17,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "Figure 10: Overlay of 2000 90 GeV showers in one calorimeter layer. Left: as simulated in Geant4. Center: same showers after a full round trip of pre-clustering and projecting back into the detector cells. Right: relative difference of the initial and processed distribution."
+    },
+    {
+      "id": 136,
+      "page": 17,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "Finally, Figure 11 presents a comparison of this difference plot for the applied procedure with 36 times higher granularity (left - same as Figure 10-right), as used in this paper, and a difference plot arising from a granularity increased by only 4 times (left). While such a lower granularity would potentially result in faster sampling times, it also shows significantly larger differences compared to the applied pre-clustering procedure."
+    },
+    {
+      "id": 137,
+      "page": 18,
+      "section": "A Effects of the Pre-Clustering",
+      "text": "Figure 11: Difference after pre-clustering and projecting back into the cell geometry for 36 times (left) and 4 times (right) increased granularity."
+    },
+    {
+      "id": 138,
+      "page": 18,
+      "section": "Acknowledgments",
+      "text": "We thank Sarah Heim for the valuable comments on the manuscript. This research was supported in part by the Maxwell computational resources operated at Deutsches Elektronen-Synchrotron DESY, Hamburg, Germany. This project has received funding from the European Union’s Horizon 2020 Research and Innovation programme under Grant Agreement No 101004761. We acknowledge support by the Deutsche Forschungsgemeinschaft under Germany’s Excellence Strategy – EXC 2121 Quantum Universe – 390833306 and via the KISS consortium (05D23GU4, 13D22CH5) funded by the German Federal Ministry of Education and Research BMBF in the ErUM-Data action plan. E.B. is partially funded by a scholarship from the Friedrich Naumann Foundation for Freedom. E.B. and W.K. acknowledge funding by the German Federal Ministry of Science and Research (BMBF) via Verbundprojekts 05H2018 - R&D COMPUTING (Pilotmaßnahme ErUM- Data) Innovative Digitale Technologien für die Erforschung von Universum und Materie. A.K. has received support from the Helmholtz Initiative and Networking Fund’s initiative for refugees as a refugee of the war in Ukraine."
+    },
+    {
+      "id": 139,
+      "page": 18,
+      "section": "References",
+      "text": "[1] HEP Software Foundation collaboration, A Roadmap for HEP Software and Computing R&D for the 2020s, Comput. Softw. Big Sci. 3 (2019) 7 [1712.06982]."
+    },
+    {
+      "id": 140,
+      "page": 18,
+      "section": "References",
+      "text": "[2] A. Boehnlein et al., HL-LHC Software and Computing Review Panel Report, 2022."
+    },
+    {
+      "id": 141,
+      "page": 18,
+      "section": "References",
+      "text": "[3] ATLAS collaboration, The ATLAS Simulation Infrastructure, Eur. Phys. J. C 70 (2010) 823"
+    },
+    {
+      "id": 142,
+      "page": 18,
+      "section": "References",
+      "text": "[4] A. Butter, S. Diefenbacher, G. Kasieczka, B. Nachman and T. Plehn, GANplifying event samples,"
+    },
+    {
+      "id": 143,
+      "page": 18,
+      "section": "References",
+      "text": "SciPost Phys. 10 (2021) 139 [2008.06545]."
+    },
+    {
+      "id": 144,
+      "page": 19,
+      "section": "References",
+      "text": "[5] S. Bieringer, A. Butter, S. Diefenbacher, E. Eren, F. Gaede, D. Hundhausen et al., Calomplification –"
+    },
+    {
+      "id": 145,
+      "page": 19,
+      "section": "References",
+      "text": "The Power of Generative Calorimeter Models, JINST 17 (2022) P09028 [2202.07352]."
+    },
+    {
+      "id": 146,
+      "page": 19,
+      "section": "References",
+      "text": "[6] M. Paganini, L. de Oliveira and B. Nachman, Accelerating Science with Generative Adversarial"
+    },
+    {
+      "id": 147,
+      "page": 19,
+      "section": "References",
+      "text": "Networks: An Application to 3D Particle Showers in Multilayer Calorimeters, Phys. Rev. Lett. 120 (2018) 042003 [1705.02355]."
+    },
+    {
+      "id": 148,
+      "page": 19,
+      "section": "References",
+      "text": "[7] M. Paganini, L. de Oliveira and B. Nachman, CaloGAN: Simulating 3D high energy particle showers in multilayer electromagnetic calorimeters with generative adversarial networks, Phys. Rev. D 97 (2018) 014021 [1712.10321]."
+    },
+    {
+      "id": 149,
+      "page": 19,
+      "section": "References",
+      "text": "[8] L. de Oliveira, M. Paganini and B. Nachman, Controlling Physical Attributes in GAN-Accelerated"
+    },
+    {
+      "id": 150,
+      "page": 19,
+      "section": "References",
+      "text": "Simulation of Electromagnetic Calorimeters, J. Phys. Conf. Ser. 1085 (2018) 042017 [1711.08813]."
+    },
+    {
+      "id": 151,
+      "page": 19,
+      "section": "References",
+      "text": "[9] M. Erdmann, L. Geiger, J. Glombitza and D. Schmidt, Generating and refining particle detector simulations using the Wasserstein distance in adversarial networks, Comput. Softw. Big Sci. 2 (2018) 4 [1802.03325]."
+    },
+    {
+      "id": 152,
+      "page": 19,
+      "section": "References",
+      "text": "[10] M. Erdmann, J. Glombitza and T. Quast, Precise simulation of electromagnetic calorimeter showers using a Wasserstein Generative Adversarial Network, Comput. Softw. Big Sci. 3 (2019) 4 [1807.01954]."
+    },
+    {
+      "id": 153,
+      "page": 19,
+      "section": "References",
+      "text": "[11] S. Vallecorsa, Generative models for fast simulation, J. Phys. Conf. Ser. 1085 (2018) 022005."
+    },
+    {
+      "id": 154,
+      "page": 19,
+      "section": "References",
+      "text": "[12] F. Carminati, A. Gheata, G. Khattak, P. Mendez Lorenzo, S. Sharan and S. Vallecorsa, Three dimensional Generative Adversarial Networks for fast simulation, J. Phys. Conf. Ser. 1085 (2018) 032016."
+    },
+    {
+      "id": 155,
+      "page": 19,
+      "section": "References",
+      "text": "[13] P. Musella and F. Pandolfi, Fast and Accurate Simulation of Particle Detectors Using Generative"
+    },
+    {
+      "id": 156,
+      "page": 19,
+      "section": "References",
+      "text": "Adversarial Networks, Comput. Softw. Big Sci. 2 (2018) 8 [1805.00850]."
+    },
+    {
+      "id": 157,
+      "page": 19,
+      "section": "References",
+      "text": "[14] The ATLAS collaboration, Deep generative models for fast shower simulation in ATLAS, Tech. Rep."
+    },
+    {
+      "id": 158,
+      "page": 19,
+      "section": "References",
+      "text": "ATL-SOFT-PUB-2018-001, CERN, Geneva (2018)."
+    },
+    {
+      "id": 159,
+      "page": 19,
+      "section": "References",
+      "text": "[15] H. Hashemi, N. Hartmann, S. Sharifzadeh, J. Kahn and T. Kuhr, Ultra-High-Resolution Detector"
+    },
+    {
+      "id": 160,
+      "page": 19,
+      "section": "References",
+      "text": "Simulation with Intra-Event Aware GAN and Self-Supervised Relational Reasoning, 2303.08046."
+    },
+    {
+      "id": 161,
+      "page": 19,
+      "section": "References",
+      "text": "[16] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol et al., Getting High: High"
+    },
+    {
+      "id": 162,
+      "page": 19,
+      "section": "References",
+      "text": "Fidelity Simulation of High Granularity Calorimeters with High Speed, Comput. Softw. Big Sci. 5 (2021) 13 [2005.05334]."
+    },
+    {
+      "id": 163,
+      "page": 19,
+      "section": "References",
+      "text": "[17] E. Buhmann, S. Diefenbacher, D. Hundhausen, G. Kasieczka, W. Korcari, E. Eren et al., Hadrons, better, faster, stronger, Mach. Learn. Sci. Tech. 3 (2022) 025014 [2112.09709]."
+    },
+    {
+      "id": 164,
+      "page": 19,
+      "section": "References",
+      "text": "[18] S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol, K. Krüger et al., New Angles on Fast"
+    },
+    {
+      "id": 165,
+      "page": 19,
+      "section": "References",
+      "text": "Calorimeter Shower Simulation, 2303.18150."
+    },
+    {
+      "id": 166,
+      "page": 19,
+      "section": "References",
+      "text": "[19] C. Krause and D. Shih, CaloFlow: Fast and Accurate Generation of Calorimeter Showers with"
+    },
+    {
+      "id": 167,
+      "page": 19,
+      "section": "References",
+      "text": "Normalizing Flows, 2106.05285."
+    },
+    {
+      "id": 168,
+      "page": 19,
+      "section": "References",
+      "text": "[20] C. Krause and D. Shih, CaloFlow II: Even Faster and Still Accurate Generation of Calorimeter"
+    },
+    {
+      "id": 169,
+      "page": 19,
+      "section": "References",
+      "text": "Showers with Normalizing Flows, 2110.11377."
+    },
+    {
+      "id": 170,
+      "page": 19,
+      "section": "References",
+      "text": "[21] S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, C. Krause, I. Shekhzadeh et al., L2LFlows:"
+    },
+    {
+      "id": 171,
+      "page": 19,
+      "section": "References",
+      "text": "Generating High-Fidelity 3D Calorimeter Images, 2302.11594."
+    },
+    {
+      "id": 172,
+      "page": 19,
+      "section": "References",
+      "text": "[22] V. Mikuni and B. Nachman, Score-based generative models for calorimeter shower simulation, Phys."
+    },
+    {
+      "id": 173,
+      "page": 19,
+      "section": "References",
+      "text": "Rev. D 106 (2022) 092009 [2206.11898]."
+    },
+    {
+      "id": 174,
+      "page": 20,
+      "section": "References",
+      "text": "[23] V. Mikuni, B. Nachman and M. Pettee, Fast Point Cloud Generation with Diffusion Models in High"
+    },
+    {
+      "id": 175,
+      "page": 20,
+      "section": "References",
+      "text": "Energy Physics, 2304.01266."
+    },
+    {
+      "id": 176,
+      "page": 20,
+      "section": "References",
+      "text": "[24] M. Leigh, D. Sengupta, G. Quétant, J.A. Raine, K. Zoch and T. Golling, PC-JeDi: Diffusion for"
+    },
+    {
+      "id": 177,
+      "page": 20,
+      "section": "References",
+      "text": "Particle Cloud Generation in High Energy Physics, 2023."
+    },
+    {
+      "id": 178,
+      "page": 20,
+      "section": "References",
+      "text": "[25] ATLAS Collaboration, AtlFast3: The Next Generation of Fast Simulation in ATLAS, Comput. Softw."
+    },
+    {
+      "id": 179,
+      "page": 20,
+      "section": "References",
+      "text": "Big Sci. 6 (2022) ."
+    },
+    {
+      "id": 180,
+      "page": 20,
+      "section": "References",
+      "text": "[26] The CMS collaboration, The CMS HGCAL detector for HL-LHC upgrade, in 5th Large Hadron"
+    },
+    {
+      "id": 181,
+      "page": 20,
+      "section": "References",
+      "text": "Collider Physics Conference, 8, 2017, DOI [1708.08234]."
+    },
+    {
+      "id": 182,
+      "page": 20,
+      "section": "References",
+      "text": "[27] T. Behnke, J.E. Brau, B. Foster, J. Fuster, M. Harrison, J.M. Paterson et al., The International Linear"
+    },
+    {
+      "id": 183,
+      "page": 20,
+      "section": "References",
+      "text": "Collider Technical Design Report - Volume 1: Executive Summary, 1306.6327."
+    },
+    {
+      "id": 184,
+      "page": 20,
+      "section": "References",
+      "text": "[28] E. Buhmann, G. Kasieczka and J. Thaler, EPiC-GAN: Equivariant Point Cloud Generation for"
+    },
+    {
+      "id": 185,
+      "page": 20,
+      "section": "References",
+      "text": "Particle Jets, 2301.08128."
+    },
+    {
+      "id": 186,
+      "page": 20,
+      "section": "References",
+      "text": "[29] R. Kansal, J. Duarte, H. Su, B. Orzari, T. Tomei, M. Pierini et al., Particle Cloud Generation with"
+    },
+    {
+      "id": 187,
+      "page": 20,
+      "section": "References",
+      "text": "Message Passing Generative Adversarial Networks, 2022."
+    },
+    {
+      "id": 188,
+      "page": 20,
+      "section": "References",
+      "text": "[30] The ILD Concept Group, International Large Detector: Interim Design Report, 2003.01116."
+    },
+    {
+      "id": 189,
+      "page": 20,
+      "section": "References",
+      "text": "[31] The iLCSoft Group, iLCSoft Project Page, 2016."
+    },
+    {
+      "id": 190,
+      "page": 20,
+      "section": "References",
+      "text": "[32] M. Frank, F. Gaede, C. Grefe and P. Mato, DD4hep: A Detector Description Toolkit for High Energy"
+    },
+    {
+      "id": 191,
+      "page": 20,
+      "section": "References",
+      "text": "Physics Experiments, Journal of Physics: Conference Series 513 (2014) 022010."
+    },
+    {
+      "id": 192,
+      "page": 20,
+      "section": "References",
+      "text": "[33] GEANT4 collaboration, GEANT4–a simulation toolkit, Nucl. Instrum. Meth. A 506 (2003) 250."
+    },
+    {
+      "id": 193,
+      "page": 20,
+      "section": "References",
+      "text": "[34] S. Luo and W. Hu, Diffusion Probabilistic Models for 3D Point Cloud Generation, 2021."
+    },
+    {
+      "id": 194,
+      "page": 20,
+      "section": "References",
+      "text": "[35] J. Sohl-Dickstein, E.A. Weiss, N. Maheswaranathan and S. Ganguli, Deep Unsupervised Learning using Nonequilibrium Thermodynamics, 2015."
+    },
+    {
+      "id": 195,
+      "page": 20,
+      "section": "References",
+      "text": "[36] J. Ho, A. Jain and P. Abbeel, Denoising Diffusion Probabilistic Models, 2020."
+    },
+    {
+      "id": 196,
+      "page": 20,
+      "section": "References",
+      "text": "[37] W. Grathwohl, R.T.Q. Chen, J. Bettencourt, I. Sutskever and D. Duvenaud, FFJORD: Free-form"
+    },
+    {
+      "id": 197,
+      "page": 20,
+      "section": "References",
+      "text": "Continuous Dynamics for Scalable Reversible Generative Models, 2018."
+    },
+    {
+      "id": 198,
+      "page": 20,
+      "section": "References",
+      "text": "[38] J. Lee, Y. Lee, J. Kim, A.R. Kosiorek, S. Choi and Y.W. Teh, Set Transformer: A Framework for"
+    },
+    {
+      "id": 199,
+      "page": 20,
+      "section": "References",
+      "text": "Attention-based Permutation-Invariant Neural Networks, 2019."
+    },
+    {
+      "id": 200,
+      "page": 20,
+      "section": "References",
+      "text": "[39] A.R. Kosiorek, H. Kim and D.J. Rezende, Conditional Set Generation with Transformers, 2020."
+    },
+    {
+      "id": 201,
+      "page": 20,
+      "section": "References",
+      "text": "[40] J. Kim, J. Yoo, J. Lee and S. Hong, SetVAE: Learning Hierarchical Composition for Generative"
+    },
+    {
+      "id": 202,
+      "page": 20,
+      "section": "References",
+      "text": "Modeling of Set-Structured Data, 2021."
+    },
+    {
+      "id": 203,
+      "page": 20,
+      "section": "References",
+      "text": "[41] F.A.D. Bello, E. Dreyer, S. Ganguly, E. Gross, L. Heinrich, M. Kado et al., Conditional Generative"
+    },
+    {
+      "id": 204,
+      "page": 20,
+      "section": "References",
+      "text": "Modelling of Reconstructed Particles at Collider Experiments, 2022."
+    },
+    {
+      "id": 205,
+      "page": 20,
+      "section": "References",
+      "text": "[42] R. Kansal, A. Li, J. Duarte, N. Chernyavskaya, M. Pierini, B. Orzari et al., Evaluating generative models in high energy physics, Physical Review D 107 (2023) ."
+    },
+    {
+      "id": 206,
+      "page": 20,
+      "section": "References",
+      "text": "[43] S.R. Qasim, J. Kieseler, Y. Iiyama and M. Pierini, Learning representations of irregular particle-detector geometry with distance-weighted graph networks, The European Physical Journal C 79 (2019) ."
+    },
+    {
+      "id": 207,
+      "page": 20,
+      "section": "References",
+      "text": "[44] T. Dao, D.Y. Fu, S. Ermon, A. Rudra and C. Ré, FlashAttention: Fast and Memory-Efficient Exact"
+    },
+    {
+      "id": 208,
+      "page": 20,
+      "section": "References",
+      "text": "Attention with IO-Awareness, 2022."
+    },
+    {
+      "id": 209,
+      "page": 20,
+      "section": "References",
+      "text": "[45] A. Gu, K. Goel and C. Ré, Efficiently Modeling Long Sequences with Structured State Spaces, 2022."
+    },
+    {
+      "id": 210,
+      "page": 21,
+      "section": "References",
+      "text": "[46] M. Poli, S. Massaroli, E. Nguyen, D.Y. Fu, T. Dao, S. Baccus et al., Hyena Hierarchy: Towards"
+    },
+    {
+      "id": 211,
+      "page": 21,
+      "section": "References",
+      "text": "Larger Convolutional Language Models, 2023."
+    },
+    {
+      "id": 212,
+      "page": 21,
+      "section": "References",
+      "text": "[47] D.P. Kingma and M. Welling, Auto-Encoding Variational Bayes, 1312.6114."
+    },
+    {
+      "id": 213,
+      "page": 21,
+      "section": "References",
+      "text": "[48] A. Paszke et al., PyTorch: An Imperative Style, High-Performance Deep Learning Library, Advances in Neural Information Processing Systems 32 (2019) 8024 [1912.01703]."
+    },
+    {
+      "id": 214,
+      "page": 21,
+      "section": "References",
+      "text": "[49] D.P. Kingma and J. Ba, Adam: A Method for Stochastic Optimization, in 3rd International Conference on Learning Representations, ICLR 2015, San Diego, CA, USA, May 7-9, 2015, Conference Track Proceedings, Y. Bengio and Y. LeCun, eds., 2015, DOI [1412.6980]."
+    },
+    {
+      "id": 215,
+      "page": 21,
+      "section": "References",
+      "text": "[50] D.J. Rezende and S. Mohamed, Variational Inference with Normalizing Flows, 2016."
+    },
+    {
+      "id": 216,
+      "page": 21,
+      "section": "References",
+      "text": "[51] C. Durkan, A. Bekasov, I. Murray and G. Papamakarios, Neural Spline Flows, 2019."
+    },
+    {
+      "id": 217,
+      "page": 21,
+      "section": "References",
+      "text": "[52] C. Durkan, A. Bekasov, I. Murray and G. Papamakarios, nflows: normalizing flows in PyTorch, Nov.,"
+    },
+    {
+      "id": 218,
+      "page": 21,
+      "section": "References",
+      "text": "2020. 10.5281/zenodo.4296287."
+    },
+    {
+      "id": 219,
+      "page": 21,
+      "section": "References",
+      "text": "[53] L. Dinh, J. Sohl-Dickstein and S. Bengio, Density estimation using Real NVP, 1605.08803."
+    },
+    {
+      "id": 220,
+      "page": 21,
+      "section": "References",
+      "text": "[54] E. Bingham, J.P. Chen, M. Jankowiak, F. Obermeyer, N. Pradhan, T. Karaletsos et al., Pyro: Deep"
+    },
+    {
+      "id": 221,
+      "page": 21,
+      "section": "References",
+      "text": "Universal Probabilistic Programming, J. Mach. Learn. Res. 20 (2019) 28:1."
+    },
+    {
+      "id": 222,
+      "page": 21,
+      "section": "References",
+      "text": "[55] Y. Song, P. Dhariwal, M. Chen and I. Sutskever, Consistency Models, 2023."
+    },
+    {
+      "id": 223,
+      "page": 21,
+      "section": "References",
+      "text": "[56] T. Salimans and J. Ho, Progressive Distillation for Fast Sampling of Diffusion Models, 2022."
+    },
+    {
+      "id": 224,
+      "page": 21,
+      "section": "References",
+      "text": "[57] E. Buhmann, F. Gaede, G. Kasieczka, A. Korol, W. Korcari, K. Krüger et al., CaloClouds II:"
+    },
+    {
+      "id": 225,
+      "page": 21,
+      "section": "References",
+      "text": "Ultra-Fast Geometry-Independent Highly-Granular Calorimeter Simulation, 2023."
+    },
+    {
+      "id": 226,
+      "page": 21,
+      "section": "References",
+      "text": "[58] M.F. Giannelli, G. Kasieczka, C. Krause, D.S. Ben Nachman, D. Shih and A. Zaborowska, “Fast"
+    },
+    {
+      "id": 227,
+      "page": 21,
+      "section": "References",
+      "text": "Calorimeter Simulation Challenge 2022.”"
+    }
+  ],
+  "skipped_pages": []
+}

@@ -1,0 +1,704 @@
+{
+  "source": "p2211.15380v1.pdf",
+  "title": null,
+  "num_pages": 9,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "Brendan Leigh Ross",
+      "text": "Layer 6 AI jesse@layer6.ai"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Gabriel Loaiza-Ganem",
+      "text": "Layer 6 AI brendan@layer6.ai"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Gabriel Loaiza-Ganem",
+      "text": "Humberto Reyes-González University of Genoa & INFN"
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "Gabriel Loaiza-Ganem",
+      "text": "Layer 6 AI gabriel@layer6.ai"
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "Gabriel Loaiza-Ganem",
+      "text": "Marco Letizia University Of Genoa & INFN marco.letizia@edu.unige.it hreyes@ge.infn.it"
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "Anthony L. Caterini",
+      "text": "Layer 6 AI anthony@layer6.ai"
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "Abstract",
+      "text": "Precision measurements and new physics searches at the Large Hadron Collider require efﬁcient simulations of particle propagation and interactions within the detectors. The most computationally expensive simulations involve calorimeter showers. Advances in deep generative modelling – particularly in the realm of highdimensional data – have opened the possibility of generating realistic calorimeter showers orders of magnitude more quickly than physics-based simulation. However, the high-dimensional representation of showers belies the relative simplicity and structure of the underlying physical laws. This phenomenon is yet another example of the manifold hypothesis from machine learning, which states that highdimensional data is supported on low-dimensional manifolds. We thus propose modelling calorimeter showers ﬁrst by learning their manifold structure, and then estimating the density of data across this manifold. Learning manifold structure reduces the dimensionality of the data, which enables fast training and generation when compared with competing methods."
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "1 Introduction",
+      "text": "The accurate simulation of particle detectors is a primary component of the high energy physics program. It allows us to map the data collected by an experiment to a theoretical description of the fundamental interactions of nature. Experimental collaborations at the Large Hadron Collider (LHC) rely on Monte Carlo simulations of physics from ﬁrst-principles to emulate the passage of billions of particles through the several stages of the LHC detectors. A particularly involved step of the simulation pipeline is the generation of calorimeter showers. An incident particle interacts with an active material in the calorimeter, producing a shower of secondary particles. In turn, the shower deposits its energy into an array of scintillators which measure the energy distribution."
+    },
+    {
+      "id": 9,
+      "page": 1,
+      "section": "1 Introduction",
+      "text": "Currently, LHC calorimeter shower generation is done with Geant4 [2–4], the state-of-the-art simulator of the passage of particles through matter. However, these simulations are very time consuming, taking up to tens of minutes per event. As the LHC enters its High Luminosity era, Monte Carlo generation will only become more complex and computationally expensive, emphasizing the need for alternative approaches enabling fast simulation."
+    },
+    {
+      "id": 10,
+      "page": 1,
+      "section": "1 Introduction",
+      "text": "Recent advances in the ﬁeld of deep generative modelling present a solution: train a surrogate model designed to emulate calorimeter showers, using data on incident particles and their resulting showers collected from experiment or expensive simulation. Deep generative models (DGMs) aim to learn the distribution of their training data, and can generate new data by sampling from the learned distribution. In the context of calorimeter showers, various types of generative models have been used including generative adversarial networks (GANs) [20] by CaloGan [33], normalizing ﬂows (NFs) [35, 11] by CaloFlow [26, 27], and score-based generative models (SGMs) [40] by CaloScore [32]. Each approach has aimed to improve on various aspects of the problem. GANs allow fast simulation, but not inference (the ability to evaluate the likelihood of a datapoint according to the learned distribution). SGMs provide excellent quality generated samples, but are slow to train and sample from. NFs allow inference and are trained by the seemingly principled approach of maximum-likelihood estimation."
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "The main drawback of NFs is that they model a density that has the same dimensionality as the input data. For calorimeter showers, the data is presented as the energy deposited per voxel of the calorimeter which can be thought of as a vector in Rn, where n is the number of voxels. Typically, n is in the hundreds or thousands, so the representation of the data is high-dimensional. This is in contrast to the relatively simple and highly structured underlying physical processes. For example, in an electromagnetic calorimeter with an incident photon, most of the interactions can be described by quantum electrodynamics [17]. The true distribution of electromagnetic showers is unknown, but its dimensionality is likely to be much smaller than n. In the machine learning context, this is an example of the manifold hypothesis, which states that high-dimensional data clusters around a low-dimensional embedded submanifold in the ambient space [5, 34]."
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "Maximum-likelihood models like NFs are built on the assumption that the underlying distribution possesses a full-dimensional probability density p(x) in the data space. When the data is conﬁned to a lowdimensional manifold, this assumption is false: the data manifold is a subset of measure zero, over which no continuous density can be integrated to obtain non-zero probabilities. This mismatch between the model and the data leads to a phenomenon known as manifold overﬁtting [29], in which the model can maximize likelihood by concentrating probability density around the manifold while incorrectly distributing the density along the manifold. The resulting phenomenon is illustrated in Fig. 1. As a result, maximum-likelihood is an ill-posed objective for manifold-supported data."
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "Figure 1: A low-dimensional density on a manifold (left), and a full-dimensional density model undergoing manifold overﬁtting (right). Although the full-dimensional model concentrates around the manifold, it distributes the density incorrectly along the manifold."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "A common method when training NFs and other DGMs is to add full-dimensional Gaussian noise to the training data [46, 45, 26]. Adding noise can avoid the problem of manifold overﬁtting, but at the cost of no longer modelling the true distribution of the data, and not recovering the manifold structure [23] which could contain interesting physics."
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "In this work we propose to better model calorimeter showers by ﬁrst learning their manifold structure and then estimating the density within [29]. This technique allows us to avoid manifold overﬁtting, while the dimensionality reduction step increases the efﬁciency of training and shower generation."
+    },
+    {
+      "id": 16,
+      "page": 2,
+      "section": "2.1 Learning the Manifold of Calorimeter Showers",
+      "text": "While it would be interesting to understand the exact distribution of showers from ﬁrst-principles, for practical applications it sufﬁces to learn the manifold M and probability density pM(x) from data. To do so, we follow the general two-step procedure outlined by Loaiza-Ganem et al. [29]. The ﬁrst step is to learn the manifold using a generalized autoencoder: any model that can construct low-dimensional latent encodings z = φ(x) of high-dimensional data x, and reconstruct the original data via an inverse transformation x = ψ(z). The learned low-dimensional encodings z act as coordinates on the data manifold. The class of generalized autoencoders includes the autoencoder [39], variational autoencoder [25], Wasserstein autoencoder [42], bidirectional GAN [12, 14], and adversarial variational Bayes [31], among others."
+    },
+    {
+      "id": 17,
+      "page": 2,
+      "section": "2.1 Learning the Manifold of Calorimeter Showers",
+      "text": "The second step is to perform density estimation in the z coordinates, obtaining low-dimensional densities p(z). Any DGM that explicitly constructs p(z) can be used, including NFs, energy based models [13], auto-regressive models [44], score-based models [41], and diffusion models [22]. Variational autoencoders and adversarial variational Bayes are also suitable as density estimators."
+    },
+    {
+      "id": 18,
+      "page": 3,
+      "section": "2.1 Learning the Manifold of Calorimeter Showers",
+      "text": "By capturing a probability density within the manifold, the two-step procedure evades the dimensionality mismatch in maximum-likelihood estimation. If required, probability densities in the data space can be computed using a change of metric from the low-dimensional coordinates into the high-dimensional space [19, 8, 37]:"
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "2.1 Learning the Manifold of Calorimeter Showers",
+      "text": "pM(x) = p(z) det where Jψ(z) is the Jacobian of ψ evaluated at z = φ(x). Since the computation of Jacobians can be expensive, we emphasize that maximizing p(z) directly is sufﬁcient for training. In addition to being more mathematically principled, two-step models are highly performant: stable diffusion [36] is one example in which a diffusion model is trained on the data manifold learned by an autoencoder, and is capable of surprisingly photorealistic image generation. Calorimeter shower simulation requires a model that can simulate showers conditional on incident energies. We assume the manifold contains showers x corresponding to all possible incident energies Einc and aim to model the conditional density pM(x | Einc). The generalized autoencoder only needs to map showers between the data space and latent space, which does not require knowledge of Einc, hence we only add conditioning to the density estimator. When Einc information is provided to the generalized autoencoder it can more easily cluster the shower data, leading to a segmented latent representation that may not generalize to unseen Einc."
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "2.2 Intrinsic Dimension Estimation",
+      "text": "In most examples of generalized autoencoders the dimensionality d of the latent representation is not learned, but is speciﬁed as a hyperparameter of the method. If d is not known a priori, it could be set empirically by trying many values and selecting the one with optimal validation performance, but training many models is computationally expensive. Instead, we employ a statistical estimator of the intrinsic dimension, several of which were reviewed in [34] and used to provide evidence for the manifold hypothesis. Here we select the Levina-Bickel estimator [28] with the MacKay-Ghahramani correction [30] because it is efﬁcient to compute, and correlates well with synthetic datasets of known dimensionality [34]. The estimator is log Tk(xi) where Tk(xi) is the Euclidean distance between datapoint xi and its kth nearest neighbour in the dataset {xi}n i=1. The hyperparameter k sets the scale at which the manifold is probed, with smaller values giving a more close up view. In the following we estimate ˆdk on the training data, then use it to specify the generalized autoencoder architecture."
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "3.1 Dataset",
+      "text": "As a proof of concept, we model the photon dataset provided by the Fast Calorimeter Simulation Challenge 2022 [18]. The training and test datasets, each containing 121,000 electromagnetic calorimeter showers simulated by Geant4, display a cylindrical geometry divided into ﬁve layers of bins in polar coordinates, with 368 voxels of deposited energies. The incident photons are parallel to the z-axis of the calorimeter, and have energies ranging from 256 MeV to over 4 TeV, increasing in powers of two, with each level represented by 10,000 samples, except at higher energies where there are fewer. We perform additional preprocessing to the dataset to facilitate training, similar to [26] and [32]. Due to noise, the total deposited energy Edep can be greater than the incident energy Einc, with the largest ratio Edep/Einc in the training set as rmax = 3.1. Each voxel of each shower is rescaled by rmaxEinc to ensure voxels are in [0, 1]. We append Edep as an additional feature, and linearly scale incident energies into the range [0, 1]. The training dataset is split 80/20 for validation."
+    },
+    {
+      "id": 22,
+      "page": 4,
+      "section": "3.1 Dataset",
+      "text": "Figure 3: Average deposited energy per voxel for the test dataset (left), and generated samples (right). The samples were conditionally generated using the distribution of energies from the test set."
+    },
+    {
+      "id": 23,
+      "page": 4,
+      "section": "3.2 Intrinsic Dimension Estimates",
+      "text": "We apply the dimension estimator Eq. (2) to the photon training dataset before and after preprocessing, with results shown in Fig. 2. Other works [26, 32] transform voxels to logit space which has a large effect on the estimated dimension since distances between datapoints are stretched. The logit transformation may have had empirical beneﬁts in these prior works in part because it increased the “effective” intrinsic dimension and thereby reduced manifold overﬁtting in models that had mismatched dimensionality. Our model does not have this issue so we do not use the logit transformation. At very small k the estimator is biased to overestimate [28, 30]. Larger k means more distant neighbours are considered for each point, effectively looking at longer length scales which can smooth out noise but also miss small (compact) dimensions. This intuition explains the decreasing nature of ˆdk with k. Based on the value at k = 10 which has provided an accurate estimate in prior work [34, 6], we use the dimension ˆd10 = 20 for our experiments."
+    },
+    {
+      "id": 24,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "Figure 2: The estimated intrinsic dimension of the photon training dataset as a function of the hyperparameter k."
+    },
+    {
+      "id": 25,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "We modelled showers with a VAE as our generalized autoencoder and a conditional NF for density estimation on the learned manifold, using the code of Loaiza-Ganem et al. [29]. The VAE’s encoder and decoder architectures were multi-layer perceptrons with 3 hidden layers of 512 units.1 The NF, implemented with the code of Durkan et al. [16], consisted of a 4-layer rational-quadratic neural spline ﬂow [15] and a 3-block residual network [21] at each layer. The output of each residual block was combined with the conditioning input using a gated linear unit [10]. The VAE and NF were each trained for 200 epochs for a total runtime of 110 minutes on a Titan V GPU, requiring only 1 GB of memory. In comparison, CaloScore [32] used 16 A100 GPUs and trained for 5 times as many epochs."
+    },
+    {
+      "id": 26,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "Table 1: Histogram χ2 separation powers in high-level features. Lower is better. L denotes layer. CE is the center of energy."
+    },
+    {
+      "id": 27,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "Edep/Einc 0.0535 Edep, L0 0.0540 Edep, L1 0.0304 Edep, L2 0.0243 Edep, L3 0.0045 Edep, L4 0.0009 CE in η, L1 0.0376 CE in η, L2 0.0512 CE in φ, L1 0.0145 CE in φ, L2 0.0391 Width in η, L1 0.1548 Width in η, L2 0.0538 Width in φ, L1 0.1080 Width in φ, L2 0.0489"
+    },
+    {
+      "id": 28,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "In Fig. 3 we show the average deposited energy per voxel for the test dataset, and for conditional samples from our model using the same incident energy distribution as the test set. The rotational symmetry of layers 1 and 2 was learned well, but our model allocated too much energy to layer 0. Conditioning the generalized autoencoder on incident energies could improve this."
+    },
+    {
+      "id": 29,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "In Table 1 we compare our model’s samples to the test set using histograms of high-level features as described in the Challenge [18]. For each feature the χ2 separation power between histograms is computed, with lower numbers indicating the model matching the true distribution. Deposited energies and the centers of energy are well-learned, with some improvement required for widths. Four corresponding histograms are shown in Fig. 4. Using the architecture and training details provided in"
+    },
+    {
+      "id": 30,
+      "page": 4,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "1Full experimental details are provided in App. A."
+    },
+    {
+      "id": 31,
+      "page": 5,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "Figure 4: Histograms of high-level features comparing generated samples to the test set."
+    },
+    {
+      "id": 32,
+      "page": 5,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "[26], we trained a binary classiﬁer to distinguish real and generated showers which achieved only 0.78 AUC. An AUC lower than 1.0 shows that many generated showers are indistinguishable from real ones. By comparison, CaloScore [32] reported 0.98 AUC."
+    },
+    {
+      "id": 33,
+      "page": 5,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "Table 2: Sample generation times"
+    },
+    {
+      "id": 34,
+      "page": 5,
+      "section": "3.3 Manifold Learning and Density Estimation",
+      "text": "Our method also demonstrates a signiﬁcant speedup in generation time compared to others. In Table 2 we show the amortized time to generate each sample for various batch sizes and numbers of samples generated. We include both the runtime of the model, and overhead to undo preprocessing on the samples which is required to produce showers in their original format. For large batch sizes, which still comfortably ﬁt on a single Titan V GPU, our generation time is as low as 0.02 ms per shower. In comparison, CaloScore [32] reported a sampling time of 40 ms per shower on the same dataset, while CaloFlow II’s best settings (on a similar dataset) required 0.08 ms per sample [27]. The Geant4 simulation times increase with incident energy, and range from 100 ms to 3 s [1]."
+    },
+    {
+      "id": 35,
+      "page": 5,
+      "section": "4 Discussion",
+      "text": "In this work we investigated deep generative models for generating calorimeter showers that learn a low-dimensional manifold structure and estimate densities on it. While the calorimeter data was represented in 368-dimensional space, we found the intrinsic dimension of the shower manifold to be approximately 20, and showed that it is possible to accurately learn the data’s density in so few dimensions. Compared to previous approaches, our use of dimension reduction led to lightweight models, signiﬁcant speedups in training and sample generation, and good performance due to the avoidance of manifold overﬁtting [29]. While this work is preliminary, we expect that further improvements are possible as the methods are scaled up."
+    },
+    {
+      "id": 36,
+      "page": 5,
+      "section": "4 Discussion",
+      "text": "For calorimeter shower simulation, past work [33, 26, 1, 32] has focused solely on creating fast and accurate density models, and has achieved these goals to varying extents. However, past models do not inform us about the nature of the manifold supporting the data distribution, which could reveal interesting physics. Furthermore, modelling mismatches could impose fundamental barriers to accurate simulation. Consider the topology of the learned distribution - normalizing ﬂows learn a diffeomorphism that acts on a simple prior distribution and hence will be unable to learn topologically non-trivial data manifolds [9]. In contrast, learning the manifold implicitly [38] can enrich the class of topologies that can be modelled without prior knowledge or additional assumptions. We expect that models which can better incorporate aspects like dimensionality, topology, geometry, compactness, and connectedness will not only perform better, but will provide more insight into the physical processes at play, especially when trained on experimental rather than simulated data."
+    },
+    {
+      "id": 37,
+      "page": 5,
+      "section": "4 Discussion",
+      "text": "Broader Impact While generative models certainly have far-reaching societal implications, for instance when used maliciously to generate images of humans [7], or new chemical structures which could be weaponized [43], we do not foresee negative societal outcomes from applying them to calorimeter showers. It should be acknowledged that the utility of surrogate models is limited by the quality of data they are trained on. In this setting, our method relies on accurate simulations of calorimeter showers from Geant4. Our method is not meant to replace physics-based simulation, but complement it by addressing the growing concern of computational cost."
+    },
+    {
+      "id": 38,
+      "page": 6,
+      "section": "Acknowledgments and Disclosure of Funding",
+      "text": "M.L. acknowledges the ﬁnancial support of the European Research Council (grant SLING 819789). The research of H.R.G. is funded by the Italian PRIN grant 20172LNEEZ."
+    },
+    {
+      "id": 39,
+      "page": 6,
+      "section": "References",
+      "text": "[1] G. Aad, A. Kupco, J. Chan, M. A. Principe Martin, P. A. Delsart, T. Dreyer, Y. Wang, K. Jakobs, A. M."
+    },
+    {
+      "id": 40,
+      "page": 6,
+      "section": "References",
+      "text": "Rodriguez Vera, S. Shaw, et al. AtlFast3: the next generation of fast simulation in ATLAS. Technical report, ATLAS-SIMU-2018-04-003, 2021."
+    },
+    {
+      "id": 41,
+      "page": 6,
+      "section": "References",
+      "text": "[2] S. Agostinelli et al. Geant4—a simulation toolkit. Nuclear Instruments and Methods in Physics Research"
+    },
+    {
+      "id": 42,
+      "page": 6,
+      "section": "References",
+      "text": "Section A: Accelerators, Spectrometers, Detectors and Associated Equipment, 506(3):250–303, 2003. ISSN 0168-9002. doi: https://doi.org/10.1016/S0168-9002(03)01368-8."
+    },
+    {
+      "id": 43,
+      "page": 6,
+      "section": "References",
+      "text": "[3] J. Allison et al. Geant4 developments and applications. IEEE Transactions on Nuclear Science, 53(1):"
+    },
+    {
+      "id": 44,
+      "page": 6,
+      "section": "References",
+      "text": "270–278, 2006. doi: 10.1109/TNS.2006.869826."
+    },
+    {
+      "id": 45,
+      "page": 6,
+      "section": "References",
+      "text": "[4] J. Allison et al. Recent developments in Geant4. Nuclear Instruments and Methods in Physics Research"
+    },
+    {
+      "id": 46,
+      "page": 6,
+      "section": "References",
+      "text": "Section A: Accelerators, Spectrometers, Detectors and Associated Equipment, 835:186–225, 2016. ISSN 0168-9002. doi: https://doi.org/10.1016/j.nima.2016.06.125."
+    },
+    {
+      "id": 47,
+      "page": 6,
+      "section": "References",
+      "text": "[5] Y. Bengio, A. Courville, and P. Vincent. Representation learning: A review and new perspectives. IEEE transactions on pattern analysis and machine intelligence, 35(8):1798–1828, 2013."
+    },
+    {
+      "id": 48,
+      "page": 6,
+      "section": "References",
+      "text": "[6] B. C. A. Brown, A. L. Caterini, B. L. Ross, J. C. Cresswell, and G. Loaiza-Ganem. The union of manifolds hypothesis and its implications for deep generative modelling. arXiv:2207.02862, 2022."
+    },
+    {
+      "id": 49,
+      "page": 6,
+      "section": "References",
+      "text": "[7] M. Brundage, S. Avin, J. Clark, H. Toner, P. Eckersley, B. Garﬁnkel, A. Dafoe, P. Scharre, T. Zeitzoff,"
+    },
+    {
+      "id": 50,
+      "page": 6,
+      "section": "References",
+      "text": "B. Filar, H. Anderson, H. Roff, G. C. Allen, J. Steinhardt, C. Flynn, S. O. hÉigeartaigh, S. Beard, H. Belﬁeld, S. Farquhar, C. Lyle, R. Crootof, O. Evans, M. Page, J. Bryson, R. Yampolskiy, and D. Amodei. The malicious use of artiﬁcial intelligence: Forecasting, prevention, and mitigation. arXiv:1802.07228, 2018."
+    },
+    {
+      "id": 51,
+      "page": 6,
+      "section": "References",
+      "text": "[8] A. L. Caterini, G. Loaiza-Ganem, G. Pleiss, and J. P. Cunningham. Rectangular ﬂows for manifold learning."
+    },
+    {
+      "id": 52,
+      "page": 6,
+      "section": "References",
+      "text": "In Advances in Neural Information Processing Systems, volume 34, 2021."
+    },
+    {
+      "id": 53,
+      "page": 6,
+      "section": "References",
+      "text": "[9] R. Cornish, A. Caterini, G. Deligiannidis, and A. Doucet. Relaxing bijectivity constraints with continuously indexed normalising ﬂows. In Proceedings of the 37th International Conference on Machine Learning, volume 119, pages 2133–2143, 2020."
+    },
+    {
+      "id": 54,
+      "page": 6,
+      "section": "References",
+      "text": "[10] Y. N. Dauphin, A. Fan, M. Auli, and D. Grangier. Language modeling with gated convolutional networks."
+    },
+    {
+      "id": 55,
+      "page": 6,
+      "section": "References",
+      "text": "In International Conference on Machine Learning, pages 933–941. PMLR, 2017."
+    },
+    {
+      "id": 56,
+      "page": 6,
+      "section": "References",
+      "text": "[11] L. Dinh, J. Sohl-Dickstein, and S. Bengio. Density estimation using Real NVP. ICLR, 2017."
+    },
+    {
+      "id": 57,
+      "page": 6,
+      "section": "References",
+      "text": "[12] J. Donahue, P. Krähenbühl, and T. Darrell. Adversarial feature learning. ICLR, 2017."
+    },
+    {
+      "id": 58,
+      "page": 6,
+      "section": "References",
+      "text": "[13] Y. Du and I. Mordatch. Implicit generation and modeling with energy based models. Advances in Neural"
+    },
+    {
+      "id": 59,
+      "page": 6,
+      "section": "References",
+      "text": "Information Processing Systems, 32:3608–3618, 2019."
+    },
+    {
+      "id": 60,
+      "page": 6,
+      "section": "References",
+      "text": "[14] V. Dumoulin, I. Belghazi, B. Poole, O. Mastropietro, A. Lamb, M. Arjovsky, and A. Courville. Adversarially learned inference. ICLR, 2017."
+    },
+    {
+      "id": 61,
+      "page": 6,
+      "section": "References",
+      "text": "[15] C. Durkan, A. Bekasov, I. Murray, and G. Papamakarios. Neural spline ﬂows. Advances in Neural"
+    },
+    {
+      "id": 62,
+      "page": 6,
+      "section": "References",
+      "text": "Information Processing Systems, 32, 2019."
+    },
+    {
+      "id": 63,
+      "page": 6,
+      "section": "References",
+      "text": "[16] C. Durkan, A. Bekasov, I. Murray, and G. Papamakarios. nﬂows: normalizing ﬂows in PyTorch, Nov. 2020."
+    },
+    {
+      "id": 64,
+      "page": 6,
+      "section": "References",
+      "text": "URL https://doi.org/10.5281/zenodo.4296287."
+    },
+    {
+      "id": 65,
+      "page": 6,
+      "section": "References",
+      "text": "[17] C. W. Fabjan and F. Gianotti. Calorimetry for particle physics. Rev. Mod. Phys., 75:1243–1286, Oct 2003."
+    },
+    {
+      "id": 66,
+      "page": 6,
+      "section": "References",
+      "text": "doi: 10.1103/RevModPhys.75.1243."
+    },
+    {
+      "id": 67,
+      "page": 6,
+      "section": "References",
+      "text": "[18] M. Faucci Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska."
+    },
+    {
+      "id": 68,
+      "page": 6,
+      "section": "References",
+      "text": "Fast Calorimeter Simulation Challenge 2022, 2022. URL https://calochallenge.github.io/ homepage/."
+    },
+    {
+      "id": 69,
+      "page": 6,
+      "section": "References",
+      "text": "[19] M. C. Gemici, D. Rezende, and S. Mohamed. Normalizing Flows on Riemannian Manifolds. arXiv:1611.02304, 2016."
+    },
+    {
+      "id": 70,
+      "page": 7,
+      "section": "References",
+      "text": "[20] I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio."
+    },
+    {
+      "id": 71,
+      "page": 7,
+      "section": "References",
+      "text": "Generative adversarial nets. Advances in Neural Information Processing Systems, 27, 2014."
+    },
+    {
+      "id": 72,
+      "page": 7,
+      "section": "References",
+      "text": "[21] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learning for image recognition. In Proceedings of the"
+    },
+    {
+      "id": 73,
+      "page": 7,
+      "section": "References",
+      "text": "IEEE Conference on Computer Vision and Pattern Recognition, pages 770–778, 2016."
+    },
+    {
+      "id": 74,
+      "page": 7,
+      "section": "References",
+      "text": "[22] J. Ho, A. Jain, and P. Abbeel. Denoising diffusion probabilistic models. Advances in Neural Information"
+    },
+    {
+      "id": 75,
+      "page": 7,
+      "section": "References",
+      "text": "Processing Systems, 33:6840–6851, 2020."
+    },
+    {
+      "id": 76,
+      "page": 7,
+      "section": "References",
+      "text": "[23] C. Horvat and J.-P. Pﬁster. Density estimation on low-dimensional manifolds: an inﬂation-deﬂation approach. arXiv preprint arXiv:2105.12152, 2021."
+    },
+    {
+      "id": 77,
+      "page": 7,
+      "section": "References",
+      "text": "[24] D. P. Kingma and J. Ba. Adam: A method for stochastic optimization. ICLR, 2015."
+    },
+    {
+      "id": 78,
+      "page": 7,
+      "section": "References",
+      "text": "[25] D. P. Kingma and M. Welling. Auto-encoding Variational Bayes. ICLR, 2014."
+    },
+    {
+      "id": 79,
+      "page": 7,
+      "section": "References",
+      "text": "[26] C. Krause and D. Shih. CaloFlow: Fast and Accurate Generation of Calorimeter Showers with Normalizing"
+    },
+    {
+      "id": 80,
+      "page": 7,
+      "section": "References",
+      "text": "Flows. arXiv:2106.05285, 2021."
+    },
+    {
+      "id": 81,
+      "page": 7,
+      "section": "References",
+      "text": "[27] C. Krause and D. Shih. CaloFlow II: Even Faster and Still Accurate Generation of Calorimeter Showers with Normalizing Flows. arXiv preprint arXiv:2110.11377, 2021."
+    },
+    {
+      "id": 82,
+      "page": 7,
+      "section": "References",
+      "text": "[28] E. Levina and P. Bickel. Maximum likelihood estimation of intrinsic dimension. In Advances in Neural"
+    },
+    {
+      "id": 83,
+      "page": 7,
+      "section": "References",
+      "text": "Information Processing Systems, volume 17. MIT Press, 2004."
+    },
+    {
+      "id": 84,
+      "page": 7,
+      "section": "References",
+      "text": "[29] G. Loaiza-Ganem, B. L. Ross, J. C. Cresswell, and A. L. Caterini. Diagnosing and Fixing Manifold"
+    },
+    {
+      "id": 85,
+      "page": 7,
+      "section": "References",
+      "text": "Overﬁtting in Deep Generative Models. Transactions on Machine Learning Research, 2022."
+    },
+    {
+      "id": 86,
+      "page": 7,
+      "section": "References",
+      "text": "[30] D. J. MacKay and Z. Ghahramani. Comments on ’Maximum Likelihood Estimation of Intrinsic Dimension’ by E. Levina and P. Bickel (2004). The Inference Group Website, Cavendish Laboratory, Cambridge University, 2005."
+    },
+    {
+      "id": 87,
+      "page": 7,
+      "section": "References",
+      "text": "[31] L. Mescheder, S. Nowozin, and A. Geiger. Adversarial Variational Bayes: Unifying variational autoencoders and generative adversarial networks. In International Conference on Machine Learning, pages 2391–2400. PMLR, 2017."
+    },
+    {
+      "id": 88,
+      "page": 7,
+      "section": "References",
+      "text": "[32] V. Mikuni and B. Nachman. Score-based Generative Models for Calorimeter Shower Simulation. arXiv preprint arXiv:2206.11898, 2022."
+    },
+    {
+      "id": 89,
+      "page": 7,
+      "section": "References",
+      "text": "[33] M. Paganini, L. de Oliveira, and B. Nachman. CaloGAN: Simulating 3D high energy particle showers in multilayer electromagnetic calorimeters with generative adversarial networks. Phys. Rev. D, 97:014021, Jan 2018. doi: 10.1103/PhysRevD.97.014021. URL https://link.aps.org/doi/10.1103/PhysRevD. 97.014021."
+    },
+    {
+      "id": 90,
+      "page": 7,
+      "section": "References",
+      "text": "[34] P. Pope, C. Zhu, A. Abdelkader, M. Goldblum, and T. Goldstein. The Intrinsic Dimension of Images and"
+    },
+    {
+      "id": 91,
+      "page": 7,
+      "section": "References",
+      "text": "Its Impact on Learning. In International Conference on Learning Representations, 2021."
+    },
+    {
+      "id": 92,
+      "page": 7,
+      "section": "References",
+      "text": "[35] D. Rezende and S. Mohamed. Variational inference with normalizing ﬂows. In International Conference on Machine Learning, pages 1530–1538. PMLR, 2015."
+    },
+    {
+      "id": 93,
+      "page": 7,
+      "section": "References",
+      "text": "[36] R. Rombach, A. Blattmann, D. Lorenz, P. Esser, and B. Ommer. High-Resolution Image Synthesis With"
+    },
+    {
+      "id": 94,
+      "page": 7,
+      "section": "References",
+      "text": "Latent Diffusion Models. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR), pages 10684–10695, June 2022."
+    },
+    {
+      "id": 95,
+      "page": 7,
+      "section": "References",
+      "text": "[37] B. L. Ross and J. C. Cresswell. Tractable Density Estimation on Learned Manifolds with Conformal"
+    },
+    {
+      "id": 96,
+      "page": 7,
+      "section": "References",
+      "text": "Embedding Flows. In Advances in Neural Information Processing Systems, volume 34, 2021."
+    },
+    {
+      "id": 97,
+      "page": 7,
+      "section": "References",
+      "text": "[38] B. L. Ross, G. Loaiza-Ganem, A. L. Caterini, and J. C. Cresswell. Neural implicit manifold learning for topology-aware generative modelling. ICML 2022 Workshop on Topology, Algebra, and Geometry in Machine Learning, 2022."
+    },
+    {
+      "id": 98,
+      "page": 7,
+      "section": "References",
+      "text": "[39] D. E. Rumelhart, G. E. Hinton, and R. J. Williams. Learning internal representations by error propagation."
+    },
+    {
+      "id": 99,
+      "page": 7,
+      "section": "References",
+      "text": "Technical report, California Univ San Diego La Jolla Inst for Cognitive Science, 1985."
+    },
+    {
+      "id": 100,
+      "page": 7,
+      "section": "References",
+      "text": "[40] Y. Song and S. Ermon. Generative Modeling by Estimating Gradients of the Data Distribution. In Advances in Neural Information Processing Systems, volume 32, 2019."
+    },
+    {
+      "id": 101,
+      "page": 7,
+      "section": "References",
+      "text": "[41] Y. Song and S. Ermon. Generative modeling by estimating gradients of the data distribution. In Proceedings of the 33rd Annual Conference on Neural Information Processing Systems, 2019."
+    },
+    {
+      "id": 102,
+      "page": 8,
+      "section": "References",
+      "text": "[42] I. Tolstikhin, O. Bousquet, S. Gelly, and B. Schoelkopf. Wasserstein auto-encoders. ICLR, 2018."
+    },
+    {
+      "id": 103,
+      "page": 8,
+      "section": "References",
+      "text": "[43] F. Urbina, F. Lentzos, C. Invernizzi, and S. Ekins. Dual use of artiﬁcial-intelligence-powered drug discovery."
+    },
+    {
+      "id": 104,
+      "page": 8,
+      "section": "References",
+      "text": "Nature Machine Intelligence, 4(3):189–191, 2022."
+    },
+    {
+      "id": 105,
+      "page": 8,
+      "section": "References",
+      "text": "[44] B. Uria, I. Murray, and H. Larochelle. Rnade: The real-valued neural autoregressive density-estimator. In"
+    },
+    {
+      "id": 106,
+      "page": 8,
+      "section": "References",
+      "text": "In Advances in Neural Information Processing Systems 26 (NIPS 26), 2013."
+    },
+    {
+      "id": 107,
+      "page": 8,
+      "section": "References",
+      "text": "[45] P. Vincent. A connection between score matching and denoising autoencoders. Neural computation, 23(7):"
+    },
+    {
+      "id": 108,
+      "page": 8,
+      "section": "References",
+      "text": "[46] P. Vincent, H. Larochelle, Y. Bengio, and P.-A. Manzagol. Extracting and composing robust features with denoising autoencoders. In Proceedings of the 25th international conference on Machine learning, pages 1096–1103, 2008."
+    },
+    {
+      "id": 109,
+      "page": 8,
+      "section": "A Appendix",
+      "text": "In this appendix we provide complete details on our model architectures, experimental setup, and evaluation approach."
+    },
+    {
+      "id": 110,
+      "page": 8,
+      "section": "A.1 Model Architectures",
+      "text": "For the experiments on the photon dataset we used a VAE as the generalized autoencoder to learn a representation of the manifold, and then trained a NF on the latent representation to estimate the density. As described in Sec. 3.2, the latent space dimension was ﬁxed at 20 based on our intrinsic dimension estimates of the data manifold."
+    },
+    {
+      "id": 111,
+      "page": 8,
+      "section": "A.1 Model Architectures",
+      "text": "The VAE’s encoder and decoder were both multi-layer perceptron neural networks with three hidden layers of 512 units each, and ReLU activations. The encoder output the means and variances for a diagonal Gaussian over the latent dimensions. The decoder output was also treated as a diagonal Gaussian with means for each data dimension but only a single variance shared across all dimensions. The prior distribution was a unit variance diagonal Gaussian over the latent space."
+    },
+    {
+      "id": 112,
+      "page": 8,
+      "section": "A.1 Model Architectures",
+      "text": "The NF was a 4-layer rational-quadratic neural spline ﬂow with a 3-block residual network in each layer. The output of each residual block was combined with the conditioning input, namely the incident energy, using a gated linear unit. The NF’s prior distribution was a unit variance diagonal Gaussian."
+    },
+    {
+      "id": 113,
+      "page": 8,
+      "section": "A.2 Experiment details",
+      "text": "All models were trained with batch sizes of 512 showers, the Adam optimizer [24] with a learning rate of 0.001, and gradient clipping with a max gradient norm of 10."
+    },
+    {
+      "id": 114,
+      "page": 8,
+      "section": "A.2 Experiment details",
+      "text": "The VAE and NF were trained sequentially. In the ﬁrst step, the VAE was trained for 200 epochs with cosine annealing from the initial learning rate. Once the VAE was trained, its parameters were frozen and the training dataset was encoded deterministically with the VAE encoder means. Then the data was rescaled by the absolute maximum element value of any datapoint. Finally, the NF was trained for 200 epochs with early stopping after 100 epochs of no validation improvement. The validation metric was the average χ2 separation power over all high level features, see Table 1, using 50,000 generated samples for the comparison. The epoch with the best validation metric was used for evaluation."
+    },
+    {
+      "id": 115,
+      "page": 8,
+      "section": "A.3 Evaluation",
+      "text": "We evaluated our two-step model by visually comparing average showers, computing histogram separation powers for high-level features, and by training a binary classiﬁer to distinguish real and generated showers. Each method requires samples from the model which were generated by conditionally sampling from the NF prior, passing through the NF, decoding with the VAE decoder, and ﬁnally undoing the preprocessing steps described in Sec. 3.1. The decoding was deterministic, only using the mean of the VAE output distribution. Showers were sampled conditionally using the same number of showers and distribution of incident energies as the test set."
+    },
+    {
+      "id": 116,
+      "page": 9,
+      "section": "A.3 Evaluation",
+      "text": "The binary classiﬁer was trained to distinguish test dataset points from a ﬁxed set of generated samples as described above. The test dataset and generated samples were separately split in a 60/20/20 ratio and respectively joined to form classiﬁer training, validation, and test sets. The classiﬁer itself was a multi-layer perceptron with three hidden layers of 512 units each, and ReLU activations. It was trained with the Adam optimizer and a learning rate of 0.0005 for a maximum of 60 epochs with early stopping after 10 rounds of no improvement in accuracy on the validation set. The epoch with best validation accuracy was used to ﬁnally evaluate the classiﬁer’s AUC on its test set."
+    }
+  ],
+  "skipped_pages": []
+}

@@ -1,0 +1,1478 @@
+{
+  "source": "p2308.11700v3.pdf",
+  "title": null,
+  "num_pages": 16,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "Ian Pang∗and David Shih†"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "NHETC, Dept. of Physics and Astronomy, Rutgers University, Piscataway, NJ 08854, USA"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "John Andrew Raine‡"
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "D´epartement de physique nucl´eaire et corpusculaire,"
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "Universit´e de Gen`eve, 1211 Gen`eve, Switzerland"
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "(Dated: May 17, 2024)"
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "Calorimeter shower superresolution",
+      "text": "Calorimeter shower simulation is a major bottleneck in the Large Hadron Collider computational pipeline. There have been recent efforts to employ deep-generative surrogate models to overcome this challenge. However, many of best performing models have training and generation times that do not scale well to high-dimensional calorimeter showers. In this work, we introduce SuperCalo, a flow-based superresolution model, and demonstrate that high-dimensional fine-grained calorimeter showers can be quickly upsampled from coarse-grained showers. This novel approach presents a way to reduce computational cost, memory requirements and generation time associated with fast calorimeter simulation models. Additionally, we show that the showers upsampled by SuperCalo possess a high degree of variation. This allows a large number of high-dimensional calorimeter showers to be upsampled from much fewer coarse showers with high-fidelity, which results in additional reduction in generation time."
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The Large Hadron Collider (LHC) stands as a remarkable scientific instrument, providing invaluable insights into the fundamental building blocks of our universe. However, the LHC’s ambitious exploration comes with computational challenges, particularly in the task of simulation (see [1–5] for recent reviews of the current status and future plans for LHC computing). Simulating high-energy particle interactions in calorimeters poses the most significant computational bottleneck (see e.g., Fig. 1 of [2]), necessitating the development of efficient and scalable simulation methods."
+    },
+    {
+      "id": 9,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "In recent years, deep learning-based surrogate models, such as Generative Adversarial Networks (GANs), Variational Autoencoders (VAEs), normalizing flows (NFs), and diffusion models [6–33], have shown promising results in accelerating the simulation process."
+    },
+    {
+      "id": 10,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "To date, most of the existing surrogate modeling approaches have attempted to directly simulate the fulldimensionality calorimeter showers in a single step, i.e. transforming noise z directly to calorimeter showers x.1"
+    },
+    {
+      "id": 11,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "This direct, one-step approach presents serious challenges for generative models when x is very high-dimensional. In this work we instead explore an alternative paradigm for the first time, which we dub SuperCalo, that applies superresolution techniques to high-dimensional calorimeter simulations."
+    },
+    {
+      "id": 12,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "∗ian.pang@physics.rutgers.edu † shih@physics.rutgers.edu ‡ john.raine@unige.ch 1 Two exceptions are [27, 34], which generated showers sequentially, layer by layer, conditioned on previous layers. This is quite different than the approach being proposed here, which will upsample coarse-grained showers all-at-once into higher-resolution showers."
+    },
+    {
+      "id": 13,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Superresolution methods based on deep learning have shown exceptional promise in image processing tasks, enhancing image quality and reconstructing high-resolution images from low-resolution inputs (see e.g., [35–43]). However, many of these existing methods generate the high-resolution images in a deterministic way, whereas our problem requires a probabilistic reconstruction of high-dimensional calorimeter showers given lower resolution calorimeter showers."
+    },
+    {
+      "id": 14,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Following the bulk of the existing approaches to fast calorimeter simulation, we will focus on representing calorimeter showers in the form of 3-D images that are binned in position space.2 In this representation, the calorimeter shower geometry is made up of voxels (volumetric pixels). In this work, we refer to these voxels interchangeably as fine voxels. Then the ultimate goal of super-resolving calorimeter showers is to learn p(⃗Efine|⃗Ecoarse). (1)"
+    },
+    {
+      "id": 15,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Here,⃗Efine are all the fine voxel energies and⃗Ecoarse is a coarse-grained representation of them."
+    },
+    {
+      "id": 16,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Of course, if we tried to learn p(⃗Efine|⃗Ecoarse) with a single model, it would be no better in terms of model size than the original problem of learning p(⃗Efine|Einc). Hence, we are exploring physically-motivated approximations to the full density."
+    },
+    {
+      "id": 17,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "One motivated ansatz is to say that each coarse voxel is upsampled to its fine voxels with a universal superresolution function that may be conditioned on some details"
+    },
+    {
+      "id": 18,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "2 Recently, there have been some works on generating much higherresolution GEANT4 hits as point clouds instead of voxels [26, 29, 32]. We believe our SuperCalo framework could also be straightforwardly extended to these setups as well."
+    },
+    {
+      "id": 19,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "such as the coarse voxel location and neighboring coarse voxel energies:"
+    },
+    {
+      "id": 20,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "Here⃗efine,i are the fine voxel energies associated with the ith coarse voxel. This ansatz assumes that after upsampling,⃗efine,i are all independent of each other. This adds importance to the choice of coarse representation, an issue we will explore in this work."
+    },
+    {
+      "id": 21,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "We test this method of generating fine-grained voxel energy showers by upsampling coarse-grained voxel energy showers on Dataset 2 [44] of the Fast Calorimeter Simulation Challenge 2022 (CaloChallenge) [45]. The goal of the CaloChallenge is to encourage the development of fast and high-fidelity calorimeter shower surrogate models. It provides three datasets of increasing dimensionality to serve as benchmarks for the community. In this work, we only focus on the second of the three datasets."
+    },
+    {
+      "id": 22,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "In Section II, we describe the details of Dataset 2 of the CaloChallenge. In Section III, we describe two possible choices of coarse voxelization and the resulting SuperCalo setup based on each choice. We also compare the performance of SuperCalo for the two choices of coarse voxelization. Next, we describe how we generate the coarse voxel energies with a flow-based setup in Section IV. In Section V, we use this setup together with SuperCalo to generate the fine voxel energies given the incident energies of the incoming particles. A schematic of this full model chain is shown in Fig. 1. We evaluate the performance of the full model chain by comparing generated and reference distributions, by using classifierbased metrics (as in [14, 15, 23, 27]), and also by performing timing studies. Finally, we conclude in Section VI."
+    },
+    {
+      "id": 23,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "Dataset 2 consists of two sets of 100k electron showers generated using Geant4 [46–48]. One set is used for training, while the second set is used for evaluation. For each shower, the dataset includes the incident energy Einc of the incoming particle and 6480 fine voxel energies⃗Efine. The incident energy Einc is log-uniformly distributed between 1 GeV and 1 TeV. The calorimeter geometry comprises 45 concentric cylindrical layers stacked along the direction of particle propagation (z); each layer is further divided into 16 angular bins (α) and nine radial bins (r). In this work, we refer to these layers synonymously as fine layers. The geometry is identical for all the layers, and a diagram of the full 3-D calorimeter voxel geometry is shown in Fig. 2."
+    },
+    {
+      "id": 24,
+      "page": 2,
+      "section": "III. SUPERCALO",
+      "text": "In this section, we introduce SuperCalo and demonstrate that the fine voxel energies can be upsampled with high fidelity from the coarse voxel energies using a conditional NF. We outline the basics of NFs in Appendix A. It is important to note that the general idea is not restricted to the use of NFs, and instead one can use alternative architectures in place of NFs. This makes SuperCalo an extremely flexible framework in the context of fast calorimeter simulation."
+    },
+    {
+      "id": 25,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "The coarse voxel geometry is obtained from the full voxel geometry of the dataset by grouping neighboring fine voxels to form coarse voxels. There are many possible choices of coarse voxelization for each given full voxel geometry. In this work, we study two such choices and compare the fidelity of the upsampled showers against the Geant4 reference. These two coarse voxelizations are visualized in Fig. 2. We discuss the advantages and disadvantages of each choice of coarse voxelization and compare samples generated by the two approaches."
+    },
+    {
+      "id": 26,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "Choice A: 1 coarse voxel = 1 r × 2 α × 5 z."
+    },
+    {
+      "id": 27,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "Here, we group voxels in the α and z directions (not in the r direction). This choice of coarse voxelization results in a coarse voxel geometry with nine coarse layers, nine radial bins and eight angular bins which is comparable to the full voxel geometry found in the pion sample of Dataset 1 [49]. Furthermore, coarse-graining in the z direction allows the inter-layer correlations between fine voxels within each coarse voxel to be learned by the flow. The downside is that correlations among fine voxels within adjacent coarse voxels in the r and α directions are not captured."
+    },
+    {
+      "id": 28,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "Choice B: 1 coarse voxel = 3 r × 4 α × 1 z."
+    },
+    {
+      "id": 29,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "Here, we group voxels in the α and r directions (not in the z direction). This choice of coarse voxelization results in a coarse voxel geometry with 45 layers, three radial bins and four angular bins. This choice of coarse voxelization helps to ensure that the total energy deposited within individual fine layers (layer energies) are learned correctly. However, it does not guarantee the correct inter-layer correlations between fine voxels."
+    },
+    {
+      "id": 30,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "For each choice of coarse voxelization, we construct a superresolution flow to generate the relative3 fine voxel energies, ˆefine,i, in a coarse voxel given the coarse voxel"
+    },
+    {
+      "id": 31,
+      "page": 2,
+      "section": "A. Coarse voxelization",
+      "text": "3 As in, normalized to sum to one."
+    },
+    {
+      "id": 32,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "FIG. 1. Schematic of full generation chain where the coarse voxel model (comprising of Flow-1 and Flow-2) and SuperCalo are applied sequentially."
+    },
+    {
+      "id": 33,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "FIG. 2. 3-D calorimeter voxel geometry for Dataset 2 showing fine voxelization (gray) and representative coarse voxels for SuperCalo A (red) and SuperCalo B (green)."
+    },
+    {
+      "id": 34,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "energy, Ecoarse,i. We recover the fine voxel energies by multiplying them by the associated coarse voxel energy. We refer to the two superresolution flows as SuperCalo A and SuperCalo B."
+    },
+    {
+      "id": 35,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "Note that choices A and B are examples of twodimensional coarse graining. We also explored threedimensional coarse grainings but found them to lead to poorer quality results. In particular, the generated samples tend to have the downsides of both choices A and B."
+    },
+    {
+      "id": 36,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "As the energy distributions within showers are highly structured, dependent on the incoming particle and the position in the calorimeter, SuperCalo uses additional conditional inputs to generate ˆefine,i:"
+    },
+    {
+      "id": 37,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "• Incident energy of the incoming particle, Einc"
+    },
+    {
+      "id": 38,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "• Deposited energy in coarse voxel i, Ecoarse,i"
+    },
+    {
+      "id": 39,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "• Fine layer energies of layers spanned by coarse voxel i (5 layers for SuperCalo A and 1 layer for SuperCalo B)"
+    },
+    {
+      "id": 40,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "• Deposited energy in neighboring coarse voxels in α, r and z directions"
+    },
+    {
+      "id": 41,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "• One-hot encoded coarse layer number"
+    },
+    {
+      "id": 42,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "• One-hot encoded coarse radial bin"
+    },
+    {
+      "id": 43,
+      "page": 3,
+      "section": "A. Coarse voxelization",
+      "text": "Note that there is maximum of 6 neighboring coarse voxels for each coarse voxel. For coarse voxels with fewer than 6 adjacent coarse voxels, the missing neighboring coarse voxel energies are padded with zeros. Also, the fine layer energies are not obtainable from the coarse shower information for choice A. However, they are obtainable from our “Flow-1” (see Table I and Section IV) which generates the 45 fine layer energies as an initial step prior to applying SuperCalo. It costs very little extra to have “Flow-1” generate the fine layer energies instead of only the coarse ones. We decided to include the fine layer energies as conditional inputs as doing so enabled SuperCalo A to more accurately model the distribution of fine voxel energies across the layers. In principle, it is possible to provide only the coarse layer energies as conditional inputs to SuperCalo, should fine layer energies not be available. The dimensions of the conditional inputs and the outputs of SuperCalo are summarized in Table I."
+    },
+    {
+      "id": 44,
+      "page": 3,
+      "section": "B. Architecture and training",
+      "text": "All the NF models in this work are chosen to be Masked Autoregressive Flows (MAFs) [50] with compositions of Rational Quadratic Splines (RQS) [51] as the transformation function. The RQS transformations are parameterized using neural networks known as MADE blocks [52]. The details of the architecture of SuperCalo A and SuperCalo B are summarized in Table II. Moreover, the training of all the NF models in this work is optimized using independent Adam optimizers [53]."
+    },
+    {
+      "id": 45,
+      "page": 3,
+      "section": "B. Architecture and training",
+      "text": "For SuperCalo A and SuperCalo B, we trained each of them using the mean log-likelihood of the data evaluated on the flow output for a total of 40 epochs with"
+    },
+    {
+      "id": 46,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "Conditionals Dim of conditional"
+    },
+    {
+      "id": 47,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "Output Dim of output"
+    },
+    {
+      "id": 48,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "Flow-1 Einc 1 Elayer 45 Flow-2 Einc,⃗E(coarse)"
+    },
+    {
+      "id": 49,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "SuperCalo A Einc, Ecoarse,i, ... 31 ˆefine,i 10 SuperCalo B Einc, Ecoarse,i, ... 57 ˆefine,i 12"
+    },
+    {
+      "id": 50,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "TABLE I. The conditional inputs for each flow, and the features whose probability distributions are the output of each flow. The full list of conditional inputs for SuperCalo A and SuperCalo B is included in Sec. III A."
+    },
+    {
+      "id": 51,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "a batch size of 60k coarse voxels. We used 70% of the training dataset for training and 30% for model selection. We used the OneCycle [54] learning rate (LR) schedule with a base (initial) LR of 2 × 10−5 and maximum LR of 1 × 10−3. The LR increases for the first 18 epochs, decreases for the next 18 epochs, and then ends with an annihilation phase (4 epochs) which gradually decreases the LR by a factor of 10 below the base LR. The epoch with the lowest test loss is selected for subsequent sample generation."
+    },
+    {
+      "id": 52,
+      "page": 4,
+      "section": "B. Architecture and training",
+      "text": "The preprocessing used during training is detailed in Appendix B."
+    },
+    {
+      "id": 53,
+      "page": 4,
+      "section": "C. Comparison with other approaches",
+      "text": "NFs have been employed successfully to generate the response of calorimeters for particle showers. However, as the granularity of showers increases the computational requirements, both in time and memory requirement, scale with O"
+    },
+    {
+      "id": 54,
+      "page": 4,
+      "section": "C. Comparison with other approaches",
+      "text": ", where D is the dimensionality of the data. To overcome this bottleneck, [27, 34] use autoregressive generation of the individual detector layers instead of one-shot generation of the full detector response. This in turn reduces the complexity to scale linearly with the number of layers, and quadratically only with the dimensionality of the data in a single layer. Our approach differs in that we still attempt to generate the full shower, and use a coarse representation in combination with SuperCalo to recover the granularity of the shower. For very high granularity showers both approaches could be complementary to one another."
+    },
+    {
+      "id": 55,
+      "page": 4,
+      "section": "C. Comparison with other approaches",
+      "text": "As we are applying SuperCalo only to a coarse representation, the initial showers can be produced with any generative model. Diffusion models, such as those in [20, 29, 33] have demonstrated state-of-the-art fidelity in shower generation, but require many passes through the same network solve the ODE trajectory from noise to showers. Distillation techniques have been employed to reduce the generation time of diffusion based models [55, 56], however combining the shower generation with SuperCalo to reduce the overall computation cost could present a viable alternative. A timing study for SuperCalo is shown in Section V D."
+    },
+    {
+      "id": 56,
+      "page": 4,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Here we discuss the performance of SuperCalo where the fine voxel energies for 100k showers are upsampled from the true coarse voxel energies from the training dataset. We compare the performance of SuperCalo for the two choices of coarse voxelization against the reference Geant4 samples."
+    },
+    {
+      "id": 57,
+      "page": 4,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "In Fig. 3, we show the distribution of layer energies in four selected layers (1st, 10th, 20th and 45th layers) to give a sense of the overall performance across all layers. It is clear from Fig. 3 that SuperCalo B (i.e. coarsegraining in r and α) results in better agreement in the layer energy distributions (especially for layer 1). This result is not surprising as each coarse voxel does not span multiple fine layers. By construction, we are guaranteed to model the layer energies Elayer,k well as long as the generated fine voxels satisfy P12 j=1 efine,ij ≈Ecoarse,i, where i and j are the coarse and fine voxel indices respectively. In contrast, each coarse voxel spans five fine layers for SuperCalo A. Hence, for each coarse voxel, SuperCalo A has to learn the correct distribution of fine voxel energies across five layers for the layer energies to be modelled well. Furthermore, as all coarse voxels are considered independently, it is not possible for SuperCalo A to capture the correlation between energy depositions across fine layers between multiple upsampled coarse voxels."
+    },
+    {
+      "id": 58,
+      "page": 4,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "We also looked at histograms for other distributions, such as fine voxel energies and the center of energy in each layer. There is generally good agreement with the reference distribution with similar performance for both choices of coarse-graining. The generated distributions are similar to results that we show in Section V and hence are not repeated here."
+    },
+    {
+      "id": 59,
+      "page": 4,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "To fully capture any mismodelling of the correlations between features that are not reflected in 1-D histograms, we train a DNN binary classifier to distinguish between our generated showers and the reference samples (see Appendix C for the classifier architecture and training procedure)."
+    },
+    {
+      "id": 60,
+      "page": 4,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "We train the classifier on both low-level features (LLFs) and high-level features (HLFs). LLFs refers to all fine voxel energies (normalized with Einc and multiplied by a factor 100) and Einc itself (preprocessed as log10 Einc). HLFs are the incident energy (preprocessed as log10 Einc), the fine layer energies (preprocessed as log10 (Elayer,i + 10−8)), the center of energy in the x and y directions (normalized with a factor 100), and the widths of the x and y distributions (normalized with a factor 100)."
+    },
+    {
+      "id": 61,
+      "page": 4,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "The classifier scores are summarized in Table III using the area under the receiver operating characteristic curve (AUC). According to the Neyman-Pearson lemma, we expect the AUC to be 0.5 if the reference and generated probability densities are equal. The AUC is 1 if the classifier is able to perfectly distinguish between reference and generated samples. The second metric, JSD ∈[0, 1], dimension of number of layer sizes number of RQS Model base distribution MADE blocks input hidden output RQS bins tail bound"
+    },
+    {
+      "id": 62,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Flow-1 45 8 256 1 × 256 1035 8 14 Flow-2 648 8 648 1 × 648 14904 8 6 SuperCalo A 10 8 128 2 × 128 230 8 14 SuperCalo B 12 8 128 2 × 128 276 8 14"
+    },
+    {
+      "id": 63,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "TABLE II. Summary of architecture of the various flow models in this work. For the hidden layer sizes, the first number is the number of hidden layers in each MADE block and the second number is the number of nodes in each hidden layer (e.g., 2 × 128 refers to 2 hidden layers per MADE block with 128 nodes per hidden layer)."
+    },
+    {
+      "id": 64,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 65,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 66,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "10−2 100 102 104 Elayer,1 (MeV)"
+    },
+    {
+      "id": 67,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "10−2 100 102 104 Elayer,10 (MeV)"
+    },
+    {
+      "id": 68,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 69,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 70,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "10−2 100 102 104 Elayer,20 (MeV)"
+    },
+    {
+      "id": 71,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "10−2 100 102 104 Elayer,45 (MeV)"
+    },
+    {
+      "id": 72,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "FIG. 3. Histograms of total energy deposited in a layer i (Elayer,i), for i = 1, 10, 20, and 45 (from left to right). Distribution of Geant4 data is shown in gray, and that of SuperCalo A (B) as red (blue) lines."
+    },
+    {
+      "id": 73,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "Coarse low-level features high-level features voxelization AUC JSD AUC JSD"
+    },
+    {
+      "id": 74,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "A (z and α) 0.660(5) 0.057(3) 0.661(6) 0.059(7)"
+    },
+    {
+      "id": 75,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "B (α and r) 0.781(3) 0.186(4) 0.587(3) 0.019(2)"
+    },
+    {
+      "id": 76,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "TABLE III. Mean and standard deviation of 10 independent classifier runs trained on generated samples from SuperCalo with two different choices (A or B) of coarse voxelization versus Geant4 samples. Note that the generated samples are obtained by upsampling the true coarse voxel energies from the training dataset using SuperCalo."
+    },
+    {
+      "id": 77,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "is the Jensen-Shannon divergence which also measures the similarity between two binned probability distributions. The JSD is 0 if the two distributions are identical and 1 if they are disjoint. From Table III, we see that the classifier scores are generally much less than unity which indicates that the generated samples are of sufficiently high fidelity to fool the classifier."
+    },
+    {
+      "id": 78,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "We note that SuperCalo A has AUC ∼0.66 for both LLF and HLF classifiers. In contrast, SuperCalo B has a lower AUC of 0.587 for the HLF classifier and higher AUC of 0.781 for the LLF classifier. The low HLF classifier AUC of SuperCalo B is consistent with the layer energy histograms in Fig 3. The high LLF classifier AUC of SuperCalo B can be explained by having incorrect inter-layer fine voxel energy correlations due to the choice of coarse voxelization. We tested this explanation by training a classifier just on voxel energies from a single layer from the reference and generated samples, and obtained a significantly lower AUC. Next, we trained a classifier on voxel energies from two adjacent layers, and this resulted in a higher AUC. We found that training a classifier on voxel energies from a larger number of adjacent layers resulted in higher AUCs. We observed this similar behavior even after repeating this experiment for adjacent layers belonging to the early, middle and later layers. See Fig. 4 for the illustration of this."
+    },
+    {
+      "id": 79,
+      "page": 5,
+      "section": "D. Comparing coarse voxelization choices",
+      "text": "To visualize the failure of SuperCalo B in capturing inter-layer correlations, we regrouped the generated fine voxels from SuperCalo A and SuperCalo B according to coarse voxelization B. Next, we define the feature"
+    },
+    {
+      "id": 80,
+      "page": 5,
+      "section": "fine",
+      "text": "which is the inner product of relative fine voxel energies associated with a pair of neighboring coarse voxels in the z-direction. Here the fine voxel energies in the coarse voxel are represented as a 12-dimensional vector⃗e (n) fine , where n is the index of the coarse voxel layer."
+    },
+    {
+      "id": 81,
+      "page": 5,
+      "section": "fine",
+      "text": "In Fig. 5, we plot the distributions of ρ, marginalized over all adjacent layers (n, n + 1), and broken down into the three coarse radial bins of voxelization B. We see that the generated ρ distribution from SuperCalo B has substantial deviation from the reference distribution"
+    },
+    {
+      "id": 82,
+      "page": 6,
+      "section": "fine",
+      "text": "FIG. 4. Plot of AUC scores for classifier trained on voxel energies from single layer (blue), two adjacent layers (red) and three adjacent layers (green). The horizontal axis indicates the layer number of the first layer’s voxels that the classifier was trained on. For the final layer (45) the preceding adjacent layers are taken, otherwise subsequent adjacent layers are taken."
+    },
+    {
+      "id": 83,
+      "page": 6,
+      "section": "fine",
+      "text": "for coarse voxels in the middle and outer coarse radial bins. In contrast, the distribution from SuperCalo A agrees relatively well with the reference in all 3 coarse radial bins which is consistent with our observation that SuperCalo A is learning the inter-layer fine voxel energy correlation better than SuperCalo B."
+    },
+    {
+      "id": 84,
+      "page": 6,
+      "section": "ENERGIES WITH FLOWS",
+      "text": "The goal of the CaloChallenge is to design generative models to learn the full joint probability density p(⃗Efine|Einc). To this end, we use two conditional NFs which we refer to as Flow-1 and Flow-2 as in [14, 15, 23]. Flow-1 learns the distribution of total deposited energy in each fine layer conditioned on the incident energy of the particle p1(⃗Elayer|Einc). This flow is the same one used in [34]. This allows us to generate the conditional inputs required for Flow-2 and SuperCalo. Flow-2 has the goal of learning the distribution of coarse voxel energies p2(⃗Ecoarse|Einc,⃗E(coarse) layer ) conditioned on the incident energy of the particle and coarse layer energies⃗E(coarse) layer . Sampling sequentially with Flow-1, Flow-2 and SuperCalo allows us to generate samples that approximately follow the distribution p(⃗Efine|Einc)."
+    },
+    {
+      "id": 85,
+      "page": 6,
+      "section": "ENERGIES WITH FLOWS",
+      "text": "As it is important for the model to capture the interlayer correlations between fine voxels, we choose SuperCalo A as the superresolution flow in the full model chain.4 The architectures of Flow-1 and Flow-2 are summarized in Table II. The details of the conditional inputs and the outputs of Flow-1 and Flow-2 are shown in Table I, while the preprocessing used during training is detailed in Appendix B."
+    },
+    {
+      "id": 86,
+      "page": 6,
+      "section": "ENERGIES WITH FLOWS",
+      "text": "Both Flow-1 and Flow-2 are MAFs with RQS transformations and are trained using the mean log-likelihood of the data evaluated on the output of the flows. We train with a batch size of 1000 for both flows. We used 70% of the training dataset for training and 30% for model selection. For Flow-1, we trained for 500 epochs using the OneCycle LR schedule [54] with base LR of 1 × 10−5 and maximum LR of 1 × 10−4, which finishes with an annihilation phase that decreases the LR by a factor of 10 lower than the base LR. For Flow-2, we trained for 40 epochs using the cyclic LR schedule [57] with a cycle length of 10 epochs. The base and initial maximum LRs were chosen to be 5×10−5 and 2×10−3 respectively. The maximum LR is decreased by 20% after each cycle. The epoch with the lowest test loss is selected for subsequent sample generation."
+    },
+    {
+      "id": 87,
+      "page": 6,
+      "section": "V. FULL CHAIN RESULTS",
+      "text": "As illustrated in Fig. 1, we generate 100k electron showers using Flow-1, Flow-2 and SuperCalo. The fidelity of the generated showers is determined by comparing against the reference Geant4 samples. As in Sec. III D, we present the same four layers when comparing layer-level distributions to give a sense of the overall performance across the full depth of the shower."
+    },
+    {
+      "id": 88,
+      "page": 6,
+      "section": "A. Distributions",
+      "text": "In Fig. 6, we can see the total deposited energy in each layer. There is relatively good agreement with the reference distribution for the most of the layers with the exception of layer 1. For layer 1, we observe that the generated layer energy distribution extends much lower than the minimum layer energy of the reference distribution. This mismatch of layer 1 energies was already seen in Fig. 3, so it is a consequence of using SuperCalo A and not the fault of the coarse shower generator Flow-2."
+    },
+    {
+      "id": 89,
+      "page": 6,
+      "section": "A. Distributions",
+      "text": "There is good agreement between the generated and reference distributions for the fine voxel energy distributions, as shown in Fig. 7. The most obvious difference is that the generated distributions generally do not capture the small peaks observed in the reference distributions."
+    },
+    {
+      "id": 90,
+      "page": 6,
+      "section": "A. Distributions",
+      "text": "4 We experimented with combining samples from SuperCalo A and SuperCalo B. In particular, the fine voxels from layers 1-5 were generated using SuperCalo B, while the other voxels were generated using SuperCalo A. While this improved the layer energy Elayer,i distributions for i = 1, 2, ..., 5, the classifier scores did not improve significantly."
+    },
+    {
+      "id": 91,
+      "page": 7,
+      "section": "Middle radial coarse voxel",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 92,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 93,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "Dataset 2 SuperCalo A SuperCalo B"
+    },
+    {
+      "id": 94,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "FIG. 5. Histograms of the ρ distribution for inner, middle and outer coarse radial bins (from left to right). Distribution of Geant4 data is shown in gray, and that of SuperCalo A (B) as red (blue) lines. See text for definition of ρ."
+    },
+    {
+      "id": 95,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "Fig. 8 shows the energy distribution over all fine voxels in the shower. The generated distribution matches the reference distribution well across six orders of magnitude, with slight differences where there are small bumps in the reference distribution."
+    },
+    {
+      "id": 96,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "Next, we compare the distributions of the ratio of total energy deposited in each of the four selected layers Elayer,i and the incident energy of the particle Einc. These are shown in Fig. 9. The generated distributions match the reference distributions well for layers 10, 20 and 45. For layer 1, we see that there is an excess at low values that is consistent with the low value excess observed in the layer 1 energy distribution in Fig. 6. In Fig. 10 we see that there our full model chain is able to generate the correct Etot/Einc distribution, with a slight overestimation at high values and underestimation at low values, though the peak itself is well modelled."
+    },
+    {
+      "id": 97,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "Next we look at the shower shape distribution within each layer. The full model chain is able to accurately generate the distributions of the centers of energy along x−axis, Cx, as shown in Fig. 11. The same plots for the center of energy along the y−axis, Cy, are nearly identical due to the rotational symmetry in the α direction. In Fig. 12, we show box-and-whisker plots of voxel energies in each of the nine radial bins within a single layer. We find that the voxel energy distributions can vary significantly across the radial bins, especially in the middle layers (see layers 10 and 20). Nevertheless, we observe good agreement between the generated and reference distributions."
+    },
+    {
+      "id": 98,
+      "page": 7,
+      "section": "Outer radial coarse voxel",
+      "text": "Lastly, we compare the sparsity of the generated and reference samples in Fig. 13. The large fraction of zero voxels (∼75%) in Dataset 2 is a major challenge for flowbased models. When training all our flow models in the work, we found that adding noise to voxel (layer) energies during training was necessary to prevent the flow from only learning zero energy voxels (layers). In Fig. 13, we see that our full chain approach accurately generates the sparsity within each layer, though with a slight overestimation in layer 1."
+    },
+    {
+      "id": 99,
+      "page": 7,
+      "section": "B. Classifier scores",
+      "text": "Similar to Sec. III D, we train a DNN binary classifier, with the same architecture and training procedure, to separate generated samples from the full chain from reference Geant4 samples. This allows us to quantify the decrease in sample quality from the combined mismodelling by the three separate flows in the full chain."
+    },
+    {
+      "id": 100,
+      "page": 7,
+      "section": "B. Classifier scores",
+      "text": "Full chain 0.726(19) 0.117(19) 0.715(3) 0.110(4)"
+    },
+    {
+      "id": 101,
+      "page": 7,
+      "section": "B. Classifier scores",
+      "text": "TABLE IV. Mean and standard deviation of 10 independent classifier runs trained on reference Geant4 samples versus generated samples from either the full model chain (this work) or iCaloFlow teacher [34]."
+    },
+    {
+      "id": 102,
+      "page": 7,
+      "section": "B. Classifier scores",
+      "text": "From the values in Table IV, we still find that both LLF and HLF classifier scores are significantly lower than unity. Also, there is only a slight degredation in performance in comparison to the values for SuperCalo A in Table III. This suggests that the combined mismodelling of Flow-1 and Flow-2 with SuperCalo does not significantly reduce the quality of the generated samples. Additionally, the AUCs/JSDs in Table IV are lower than those of the iCaloFlow teacher model [34], which was evaluated on the same classifier architecture."
+    },
+    {
+      "id": 103,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "10−2 100 102 104 Elayer,1 (MeV)"
+    },
+    {
+      "id": 104,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "10−2 100 102 104 Elayer,10 (MeV)"
+    },
+    {
+      "id": 105,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "10−2 100 102 104 Elayer,20 (MeV)"
+    },
+    {
+      "id": 106,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "10−2 100 102 104 Elayer,45 (MeV)"
+    },
+    {
+      "id": 107,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "FIG. 6. Histograms of total energy deposited in a layer i (Elayer,i), for i = 1, 10, 20, and 45 (from left to right). Distribution of Geant4 data is shown in gray, and that of our full model chain as red lines."
+    },
+    {
+      "id": 108,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "FIG. 7. Histograms of fine voxel energy distribution in a layer i, for i = 1, 10, 20, and 45 (from left to right). Distribution of Geant4 data is shown in gray, and that of our full model chain as red lines."
+    },
+    {
+      "id": 109,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "All layers"
+    },
+    {
+      "id": 110,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "10−2 101 104 Eﬁne,a (MeV)"
+    },
+    {
+      "id": 111,
+      "page": 8,
+      "section": "B. Classifier scores",
+      "text": "FIG. 8. Histograms of energy deposition per fine voxel in all layers. Distributions of Geant4 data are shown in gray, and those of the full model chain as red lines."
+    },
+    {
+      "id": 112,
+      "page": 8,
+      "section": "C. Degree of variation across upsampled showers",
+      "text": "To test the degree of variation of the fine voxels that are upsampled from coarse voxels, we upsample 100k full-dimensional calorimeter showers from fewer total (< 100k) coarse showers. For example, we could first sample"
+    },
+    {
+      "id": 113,
+      "page": 8,
+      "section": "C. Degree of variation across upsampled showers",
+      "text": "20k coarse showers using the Flow-1+Flow-2 setup. Next, we upsample each coarse shower five independent times using SuperCalo to generate the full set of 100k fine showers. When upsampled from 20,000 showers, we have LLF and HLF classifier AUCs of 0.762 and 0.724 respectively which are still far from unity. This suggests that these samples are still of sufficiently high fidelity. The classifier scores for full-dimensional calorimeter showers upsampled from different number of coarse showers are shown in Table V. Here we see that our samples still have high-fidelity even with much fewer coarse showers (e.g., 5 × 103). We find that the classifier is only able to clearly distinguish the generated samples from the reference samples when we upsample from as few as 1000 coarse showers. This study suggests that SuperCalo is able to generate a substantial amount variation in the upsampled fine voxels."
+    },
+    {
+      "id": 114,
+      "page": 8,
+      "section": "D. Timing",
+      "text": "Generation speed is a key performance metric for fast calorimeter surrogate models. The Geant4 generation time per event strongly depends on the incident energy of the incoming particle, with the generation time being much longer for the showers with higher incident energies. When averaged over incident energy, it is approxi-"
+    },
+    {
+      "id": 115,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "FIG. 9. Histograms of the ratio of total energy deposited and incident energy in a layer i (Elayer,i), for i = 1, 10, 20, and 45 (from left to right). Distribution of Geant4 data is shown in gray, and that of the full model chain as red lines."
+    },
+    {
+      "id": 116,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "All layers"
+    },
+    {
+      "id": 117,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "FIG. 10. Histograms of the ratio of total energy deposition (all layers) and incident energy. Distributions of Geant4 data are shown as black lines, and that of the full model chain as red lines."
+    },
+    {
+      "id": 118,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "Number of low-level features high-level features coarse showers AUC JSD AUC JSD"
+    },
+    {
+      "id": 119,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "TABLE V. Mean and standard deviation of 10 independent classifier runs for showers that were upsampled from fewer than 100k coarse showers."
+    },
+    {
+      "id": 120,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "mately O(100 s) per event. In contrast, like most other deep learning-based fast calorimeter simulation models, the generation time of our setup is independent of incident energy. In Table VI, we show the generation time per event for the full model chain at different batch sizes on the GPU/CPU. Here the batch size refers to the number of coarse showers generated per batch, where each coarse shower contains 648 coarse voxel energies. Generating the full 100k coarse showers with Flow-1+Flow- 2, we find that the full model setup which includes SuperCalo is able to achieve O(103) speedup compared to Geant4 for a batch size of 1000 events. For the same batch size, we are able to achieve a speed-up factor of ∼1.9 compared to iCaloFlow teacher [34], which also has an MAF-based setup. We estimate that replacing the MAF architecture used here with an IAF or couplinglayer architecture would allow us to achieve a generation time of ∼ 1.4 ms per event for a batch size of 1000. This would be a speed-up factor of ∼1.6 compared to iCaloFlow student [34] for the same batch size.5"
+    },
+    {
+      "id": 121,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "We also include the timings for reduced number of coarse showers (see Section V C) in Table VI. As the generation of coarse showers represents the most computationally intensive component of generation, we find that we are able to get a factor of ∼N reduction in total generation time by generating a factor of N fewer coarse showers with the Flow-1+Flow-2 setup and resampling N times from SuperCalo."
+    },
+    {
+      "id": 122,
+      "page": 9,
+      "section": "D. Timing",
+      "text": "The faster generation time together with the variation in upsampled showers suggests that resampling from SuperCalo could be used to reduce the number of coarsegrained simulated showers which need to be generated, saving even more computation time. This would be particularly beneficial if coarse-grained showers are produced with more time-intensive generative models, such as diffusion."
+    },
+    {
+      "id": 123,
+      "page": 9,
+      "section": "VI. CONCLUSION",
+      "text": "In this work, we demonstrated the potential of generating high-dimensional calorimeter showers by upsampling coarser showers with SuperCalo. While we used"
+    },
+    {
+      "id": 124,
+      "page": 9,
+      "section": "VI. CONCLUSION",
+      "text": "5 Most of the speed-up comes from replacing the MAF with an IAF in Flow-2. The relative speed-up of SuperCalo itself would be a factor of ∼10 compared to the MAF. Coupling layers are expected to result in similar timings."
+    },
+    {
+      "id": 125,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "FIG. 11. Histograms of the centers of energy along the x-axis, Cx. Distribution of Geant4 data is shown in gray, and that of the full model chain as red lines. Due to the symmetry of the detector and incident beam, the distributions for the centers of energy in the y direction (Cy) are statistically identical to Cy."
+    },
+    {
+      "id": 126,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "Layer 1"
+    },
+    {
+      "id": 127,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 128,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "Layer 20"
+    },
+    {
+      "id": 129,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 130,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "Layer 10"
+    },
+    {
+      "id": 131,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 132,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "Layer 45"
+    },
+    {
+      "id": 133,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 134,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "FIG. 12. Box and whisker plots showing the distribution of energy deposited in each ring of voxels at fixed radial distance from the beam line (nine rings in total) in layers 1, 10, 20, and 45. Geant4 data are shown in black, events generated by the full model chain are shown in red. Each box extends from the first quartile of energies greater than zero to the third quartile. The whiskers extend from the 5th to 95th percentile of the non-zero energy deposition. Lower subplots show f0, the average fraction of voxels in each radial ring with zero energy deposition."
+    },
+    {
+      "id": 135,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "normalizing flows in this first proof-of-concept work, the SuperCalo approach is completely general and can be applied to any generative modeling framework."
+    },
+    {
+      "id": 136,
+      "page": 10,
+      "section": "VI. CONCLUSION",
+      "text": "For more time-intensive alternative models that are"
+    },
+    {
+      "id": 137,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "FIG. 13. Histograms of fraction of voxels in layers 1, 10, 20, and 45 (from left to right) which have non-zero energy deposition f0. Distributions of Geant4 data are shown in gray, and those of the full model chain as red lines."
+    },
+    {
+      "id": 138,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "Number of Resampling Generation time per event (ms) coarse showers Batch size factor GPU CPU"
+    },
+    {
+      "id": 139,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "TABLE VI. Average time taken to generate a single shower event by the full chain for different number of coarse showers generated by the Flow-1+Flow-2 setup. The timing was computed for different generation batch sizes on an Intel i9- 7900X CPU at 3.30GHz and a TITAN V GPU. Here the batch size refers to the number of coarse showers generated per batch. For each batch of coarse showers, the number of fine showers generated is equal to the batch size multiplied by the resampling factor. We were not able to calculate the CPU timings for larger batch sizes due to memory constraints."
+    },
+    {
+      "id": 140,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "able to generate higher fidelity coarse showers compared to our Flow-1+Flow-2 setup, we can reduce the overall generation time by sampling a factor of N fewer coarse showers and resampling N times from SuperCalo to obtain fine showers that are still expected to be of very high fidelity."
+    },
+    {
+      "id": 141,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "As this work only serves as a proof-of-concept for the SuperCalo idea, we did not extensively optimize the flow architecture and hyperparameters used in this study. An interesting extension to this work would be to implement this setup using an IAF or coupling-layer architecture. This is expected to bring about significant generation speed-up, while possibly preserving the high-fidelity of the upsampled showers. Attempts to correlate the upsampling across all coarse voxels could also be studied. If successful, this might allow us to use alternative coarse voxelizations (e.g., Choice B) that make it easier to accurately model the HLFs."
+    },
+    {
+      "id": 142,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "At the ML4Jets 2023 conference, SuperCalo was presented as one of the best in terms of sample quality for Dataset 2. However, the specific implementation described in this paper suffers in terms of speed compared to the fastest models in the CaloChallenge due to the fact that we are using a MAF (instead of IAF). Nevertheless, it is important to note that the SuperCalo framework is implementable with many other architectures and hence the speed may vary based on the architecture choice."
+    },
+    {
+      "id": 143,
+      "page": 11,
+      "section": "VI. CONCLUSION",
+      "text": "Another promising extension to this work would be to generalize this approach to even higher-dimensional calorimeter showers (e.g., Dataset 3 of the CaloChallenge [58]). This would require a superresolution flow that generates O(100) fine voxel energies given a single coarse voxel energy."
+    },
+    {
+      "id": 144,
+      "page": 11,
+      "section": "ACKNOWLEDGEMENTS",
+      "text": "IP and DS are supported by DOE grant DOE- SC0010008. JR is supported with funding through the SNSF Sinergia grant CRSII5 193716 “Robust Deep Density Models for High-Energy Particle Physics and Solar Flare Analysis (RODEM)” and the SNSF project grant 200020 212127 “At the two upgrade frontiers: machine learning and the ITk Pixel detector”. In this work, we used the NumPy 1.16.4 [59], Matplotlib 3.1.0 [60], scikit-learn 0.21.2 [61], h5py 2.9.0 [62], pytorch 1.11.1 [63], and nflows 0.14 [64] software packages. Our code is available at https://github.com/Ian-Pang/supercalo."
+    },
+    {
+      "id": 145,
+      "page": 11,
+      "section": "Appendix A: Normalizing flows",
+      "text": "A normalizing flow (NF) [65–70] is a parametric diffeomorphism fθ between a latent space, with known distribution π(z), and a data space of interest with unknown distribution p(x). In the case of a conditional NF, this transformation becomes fθ(x|c) which maps to the conditional probability density, where c are the conditional inputs to the flow."
+    },
+    {
+      "id": 146,
+      "page": 12,
+      "section": "Appendix A: Normalizing flows",
+      "text": "It is defined by a series of invertible functions, parametrized by θ, which can be trained following the change of variables formula det log where J is the Jacobian of the transformation fθ(x|c). The allowed transformations must have a tractable Jacobian, which is ideally efficient to compute, and the probability density of the target distribution must be known. A common choice for π(z) is the standard normal distribution."
+    },
+    {
+      "id": 147,
+      "page": 12,
+      "section": "Appendix A: Normalizing flows",
+      "text": "During generation, it is possible to sample from the known distribution π(z) and perform the inverse mapping f −1"
+    },
+    {
+      "id": 148,
+      "page": 12,
+      "section": "Appendix A: Normalizing flows",
+      "text": "(z|c) given some observation c and return a single probabilistic sample under p(x). By sampling the full distribution π(z) it is possible to recover the full conditional distribution."
+    },
+    {
+      "id": 149,
+      "page": 12,
+      "section": "Appendix A: Normalizing flows",
+      "text": "This makes NFs particularly well suited to learning the inverse mappings for which there is not a unique solution, either due to stochasticity or an information bottleneck such as dimension reduction. As such they are a logical choice for learning p(⃗Efine|⃗Ecoarse)."
+    },
+    {
+      "id": 150,
+      "page": 12,
+      "section": "Appendix A: Normalizing flows",
+      "text": "NFs have already shown promising performance in applications to high energy physics both directly for detector simulation [14, 15, 23, 24, 27, 34], as well as for event generation and analysis applications [71–95]."
+    },
+    {
+      "id": 151,
+      "page": 12,
+      "section": "Appendix B: Pre- and postprocessing",
+      "text": "The incident energy of the incoming particle Einc is a conditional input for all the NFs used in this work and is preprocessed as"
+    },
+    {
+      "id": 152,
+      "page": 12,
+      "section": "Appendix B: Pre- and postprocessing",
+      "text": "Einc 104.5 MeV ∈[−1.5, 1.5] (B1)"
+    },
+    {
+      "id": 153,
+      "page": 12,
+      "section": "Appendix B: Pre- and postprocessing",
+      "text": "In Flow-1, the total energy deposited in layer i (Elayer,i) is calculated by summing the energy values of all voxels in that layer. To address difficulties in learning distributions with many exactly zero elements, uniform noise within the range of [0, 5] keV is added to Elayer,i [14]. This noisy energy value, xi, is then normalized by dividing it by 65 GeV, which is slightly larger than the maximum energy deposition observed in any layer of any event in the dataset:"
+    },
+    {
+      "id": 154,
+      "page": 12,
+      "section": "Appendix B: Pre- and postprocessing",
+      "text": "Elayer,i →xi ≡(Elayer,i + rand[0, 5 keV])/65 GeV (B2)"
+    },
+    {
+      "id": 155,
+      "page": 12,
+      "section": "Appendix B: Pre- and postprocessing",
+      "text": "In the final step, a logit transformation is applied to xi to obtain yi:"
+    },
+    {
+      "id": 156,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "where the offset α ≡10−6 is introduced to ensure that the boundaries xi = 0 and 1 map to finite numbers."
+    },
+    {
+      "id": 157,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "For Flow-2, we obtain the coarse voxel energies by summing up all the fine voxels associated to each coarse voxel. The coarse voxel energies are then preprocessed as"
+    },
+    {
+      "id": 158,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "Ecoarse,i →log10 ((Ecoarse,i + rand[0, 5 keV])/Ecoarse,max)+6"
+    },
+    {
+      "id": 159,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "(B4) where Ecoarse,max is the maximum coarse voxel energy in the training dataset."
+    },
+    {
+      "id": 160,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "The coarse layer energies⃗E(coarse) layer are obtained by summing the coarse voxel energies (with added noise) in each coarse layer. The coarse layer energies are then processed as"
+    },
+    {
+      "id": 161,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "4 log10"
+    },
+    {
+      "id": 162,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "For SuperCalo, we preprocess the coarse voxel energies Ecoarse,i according to the following transformations:"
+    },
+    {
+      "id": 163,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "Ecoarse,i →˜xi ≡(Ecoarse,i + rand[0, 1 keV])/Ecoarse,max"
+    },
+    {
+      "id": 164,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "The energies of neighboring coarse voxels are preprocessed in the same way but without the addition of noise."
+    },
+    {
+      "id": 165,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "Like in Flow-1, the fine layer energies Elayer,i are preprocessed according to Eqns. B1 and B2 but without the addition of noise. The coarse layer and coarse r-bin labels used in the conditional inputs of SuperCalo are one-hot encoded."
+    },
+    {
+      "id": 166,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "Lastly, the fine voxel energies efine,ij associated to the ith coarse voxel is preprocessed as efine,ij →ˆxij ≡(efine,ij + rand[0, 0.1 keV])/Ecoarse,i"
+    },
+    {
+      "id": 167,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "ˆyij = log ˆuij 1 −ˆuij ˆuij ≡α + (1 −2α)ˆxij (B9)"
+    },
+    {
+      "id": 168,
+      "page": 12,
+      "section": "yi = log (B3)",
+      "text": "During generation, the preprocessing is inverted for the outputs of the flow to recover the correct physical quantities. Since the minimum fine voxel energy in Dataset 2 is 15 keV, a cut is applied to the generated outputs (in physical units) of Flow-1, Flow-2 and SuperCalo such that energies below 15 keV are set to zero."
+    },
+    {
+      "id": 169,
+      "page": 12,
+      "section": "Appendix C: Classifier architecture",
+      "text": "The classifier performance evaluation in this study relies on a neural network architecture obtained from the CaloChallenge [45] evaluation script."
+    },
+    {
+      "id": 170,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "To elaborate, the classifier is a deep, fully-connected neural network comprising an input layer and two hidden layers, each containing 2048 nodes. All activation functions in the hidden layers are leaky ReLUs, with a default negative slope of 0.01. However, the output layer uses a sigmoid activation function to produce a single output number. No regularization techniques such as batch normalization or dropout are applied."
+    },
+    {
+      "id": 171,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "The input data for low- and high-level feature classification is preprocessed following the methodology described in the main text. A dataset consisting of 100k showers [44] is used, which is split into train, test, and validation sets in a 60:20:20 ratio. This is an indepen-"
+    },
+    {
+      "id": 172,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "[1] O. Br¨uning and L. Rossi, eds., The High Luminosity"
+    },
+    {
+      "id": 173,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Large Hadron Collider: the new machine for illuminating the mysteries of Universe, vol. 24, World Scientific (2015), 10.1142/9581. [2] P. Calafiura, J. Catmore, D. Costanzo and"
+    },
+    {
+      "id": 174,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "A. Di Girolamo, ATLAS HL-LHC Computing Conceptual Design Report, Tech. Rep. CERN-LHCC-2020-015, LHCC-G-178, CERN, Geneva (2020). [3] CMS collaboration, CMS Phase-2 Computing Model:"
+    },
+    {
+      "id": 175,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Update Document, Tech. Rep. , CERN, Geneva (2022). [4] ATLAS collaboration, ATLAS Software and Computing"
+    },
+    {
+      "id": 176,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "HL-LHC Roadmap, Tech. Rep. , CERN, Geneva (2022). [5] HEP Software Foundation collaboration, HL-LHC"
+    },
+    {
+      "id": 177,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Computing Review: Common Tools and Community Software, in 2022 Snowmass Summer Study, P. Canal et al., eds., 8, 2020, DOI [2008.13636]. [6] M. Paganini, L. de Oliveira and B. Nachman,"
+    },
+    {
+      "id": 178,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Accelerating Science with Generative Adversarial Networks: An Application to 3D Particle Showers in Multilayer Calorimeters, Phys. Rev. Lett. 120 (2018) 042003 [1705.02355]. [7] M. Paganini, L. de Oliveira and B. Nachman,"
+    },
+    {
+      "id": 179,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "CaloGAN: Simulating 3d high energy particle showers in multilayer electromagnetic calorimeters with generative adversarial networks, Physical Review D 97 (2018) . [8] L. de Oliveira, M. Paganini and B. Nachman,"
+    },
+    {
+      "id": 180,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Controlling Physical Attributes in GAN-Accelerated Simulation of Electromagnetic Calorimeters, J. Phys. Conf. Ser. 1085 (2018) 042017 [1711.08813]. [9] M. Erdmann, L. Geiger, J. Glombitza and D. Schmidt,"
+    },
+    {
+      "id": 181,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Generating and refining particle detector simulations using the Wasserstein distance in adversarial networks, Comput. Softw. Big Sci. 2 (2018) 4 [1802.03325]. [10] M. Erdmann, J. Glombitza and T. Quast, Precise simulation of electromagnetic calorimeter showers using a Wasserstein Generative Adversarial Network, Comput. Softw. Big Sci. 3 (2019) 4 [1807.01954]. [11] D. Belayneh et al., Calorimetry with deep learning:"
+    },
+    {
+      "id": 182,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "particle simulation and reconstruction for collider physics, Eur. Phys. J. C 80 (2020) 688 [1912.06794]. [12] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 183,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Kasieczka, A. Korol et al., Getting High: High Fidelity Simulation of High Granularity Calorimeters with High Speed, Comput. Softw. Big Sci. 5 (2021) 13 dent dataset that was not used to train the models in this work."
+    },
+    {
+      "id": 184,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "The neural networks are optimized through training for 50 epochs using the Adam optimizer [53] with an initial learning rate of 2 × 10−4. The batch size of 1000 is used and the binary cross-entropy is minimized during training."
+    },
+    {
+      "id": 185,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "For the final evaluation, the model state with the highest accuracy on the validation set is selected, and the classifier is subsequently calibrated using isotonic regression [96] from the sklearn library [61] based on the validation dataset before being evaluated on the test set."
+    },
+    {
+      "id": 186,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "[2005.05334]. [13] ATLAS Collaboration collaboration, Fast simulation of the ATLAS calorimeter system with Generative Adversarial Networks, Tech. Rep. ATL-SOFT-PUB-2020-006, CERN, Geneva (Nov, 2020). [14] C. Krause and D. Shih, Fast and accurate simulations of calorimeter showers with normalizing flows, Phys. Rev. D 107 (2023) 113003 [2106.05285]. [15] C. Krause and D. Shih, Accelerating accurate simulations of calorimeter showers with normalizing flows and probability density distillation, Phys. Rev. D 107 (2023) 113004 [2110.11377]. [16] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 187,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Kasieczka, A. Korol et al., Decoding photons: Physics in the latent space of a bib-ae generative network, EPJ Web Conf. 251 (2021) 03003 [2102.12491]. [17] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 188,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "D. Hundhausen, G. Kasieczka et al., Fast and accurate electromagnetic and hadronic showers from generative models, in EPJ Web of Conferences, vol. 251, p. 03049, EDP Sciences, 2021. [18] E. Buhmann, S. Diefenbacher, D. Hundhausen,"
+    },
+    {
+      "id": 189,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Kasieczka, W. Korcari, E. Eren et al., Hadrons, better, faster, stronger, Mach. Learn. Sci. Tech. 3 (2022) 025014 [2112.09709]. [19] ATLAS collaboration, AtlFast3: the next generation of fast simulation in ATLAS, Comput. Softw. Big Sci. 6 (2022) 7 [2109.02551]. [20] V. Mikuni and B. Nachman, Score-based generative models for calorimeter shower simulation, Phys. Rev. D 106 (2022) 092009 [2206.11898]. [21] ATLAS collaboration, Deep Generative Models for Fast"
+    },
+    {
+      "id": 190,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Photon Shower Simulation in ATLAS, Comput. Softw. Big Sci. 8 (2024) 7 [2210.06204]. [22] A. Adelmann et al., New directions for surrogate models and differentiable programming for High Energy Physics detector simulation, in 2022 Snowmass Summer Study, 3, 2022 [2203.08806]. [23] C. Krause, I. Pang and D. Shih, CaloFlow for"
+    },
+    {
+      "id": 191,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "CaloChallenge Dataset 1, 2210.14245. [24] J.C. Cresswell, B.L. Ross, G. Loaiza-Ganem,"
+    },
+    {
+      "id": 192,
+      "page": 13,
+      "section": "Appendix C: Classifier architecture",
+      "text": "H. Reyes-Gonzalez, M. Letizia and A.L. Caterini, CaloMan: Fast generation of calorimeter showers with density estimation on learned manifolds, in 36th"
+    },
+    {
+      "id": 193,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Conference on Neural Information Processing Systems, 11, 2022 [2211.15380]. [25] A. Abhishek, E. Drechsler, W. Fedorko and B. Stelzer,"
+    },
+    {
+      "id": 194,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "CaloDVAE : Discrete Variational Autoencoders for Fast Calorimeter Shower Simulation, 10, 2022 [2210.07430]. [26] S. Schnake, D. Krucker and K. Borras, Generating calorimeter showers as point clouds, . [27] S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka,"
+    },
+    {
+      "id": 195,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "C. Krause, I. Shekhzadeh et al., L2LFlows: generating high-fidelity 3D calorimeter images, JINST 18 (2023) P10017 [2302.11594]. [28] S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka,"
+    },
+    {
+      "id": 196,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "A. Korol, K. Kr¨uger et al., New angles on fast calorimeter shower simulation, Mach. Learn. Sci. Tech. 4 (2023) 035044 [2303.18150]. [29] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 197,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Kasieczka, A. Korol et al., CaloClouds: Fast Geometry-Independent Highly-Granular Calorimeter Simulation, 2305.04847. [30] H. Hashemi, N. Hartmann, S. Sharifzadeh, J. Kahn and"
+    },
+    {
+      "id": 198,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Kuhr, Ultra-High-Resolution Detector Simulation with Intra-Event Aware GAN and Self-Supervised Relational Reasoning, 2303.08046. [31] J. Dubi´nski, K. Deja, S. Wenzel, P. Rokita and"
+    },
+    {
+      "id": 199,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Trzci´nski, Machine learning methods for simulating particle response in the zero degree calorimeter at the ALICE experiment, CERN, AIP Conf. Proc. 3061 (2024) 040001 [2306.13606]. [32] F.T. Acosta, V. Mikuni, B. Nachman, M. Arratia,"
+    },
+    {
+      "id": 200,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "K. Barish, B. Karki et al., Comparison of Point Cloud and Image-based Models for Calorimeter Fast Simulation, 2307.04780. [33] O. Amram and K. Pedro, Denoising diffusion models with geometry adaptation for high fidelity calorimeter simulation, Phys. Rev. D 108 (2023) 072014 [2308.03876]. [34] M.R. Buckley, C. Krause, I. Pang and D. Shih, Inductive simulation of calorimeter showers with normalizing flows, Phys. Rev. D 109 (2024) 033006 [2305.11934]. [35] C. Dong, C.C. Loy, K. He and X. Tang, Image super-resolution using deep convolutional networks, IEEE transactions on pattern analysis and machine intelligence 38 (2015) 295. [36] J. Kim, J.K. Lee and K.M. Lee, Accurate image super-resolution using very deep convolutional networks, in Proceedings of the IEEE conference on computer vision and pattern recognition, pp. 1646–1654, 2016. [37] B. Lim, S. Son, H. Kim, S. Nah and K. Mu Lee,"
+    },
+    {
+      "id": 201,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Enhanced deep residual networks for single image super-resolution, in Proceedings of the IEEE conference on computer vision and pattern recognition workshops, pp. 136–144, 2017. [38] C. Ledig, L. Theis, F. Husz´ar, J. Caballero,"
+    },
+    {
+      "id": 202,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "A. Cunningham, A. Acosta et al., Photo-realistic single image super-resolution using a generative adversarial network, in Proceedings of the IEEE conference on computer vision and pattern recognition, pp. 4681–4690, 2017. [39] Y. Zhang, K. Li, K. Li, L. Wang, B. Zhong and Y. Fu,"
+    },
+    {
+      "id": 203,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Image super-resolution using very deep residual channel attention networks, in Proceedings of the European conference on computer vision (ECCV), pp. 286–301, 2018. [40] X. Wang, K. Yu, S. Wu, J. Gu, Y. Liu, C. Dong et al.,"
+    },
+    {
+      "id": 204,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Esrgan: Enhanced super-resolution generative adversarial networks, in Proceedings of the European conference on computer vision (ECCV) workshops, pp. 0–0, 2018. [41] P. Baldi, L. Blecher, A. Butter, J. Collado,"
+    },
+    {
+      "id": 205,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "J.N. Howard, F. Keilbach et al., How to GAN Higher Jet Resolution, SciPost Phys. 13 (2022) 064 [2012.11944]. [42] F.A. Di Bello, S. Ganguly, E. Gross, M. Kado, M. Pitt,"
+    },
+    {
+      "id": 206,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "L. Santi et al., Towards a Computer Vision Particle Flow, Eur. Phys. J. C 81 (2021) 107 [2003.08863]. [43] J. Erdmann, A. van der Graaf, F. Mausolf and"
+    },
+    {
+      "id": 207,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "O. Nackenhorst, SR-GAN for SR-gamma: super resolution of photon calorimeter images at collider experiments, Eur. Phys. J. C 83 (2023) 1001 [2308.09025]. [44] M.F. Giannelli, G. Kasieczka, C. Krause, B. Nachman,"
+    },
+    {
+      "id": 208,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "D. Salamani, D. Shih et al., “Fast calorimeter simulation challenge 2022 - dataset 2.” https://doi.org/10.5281/zenodo.6366271, March, 2022. [45] M. Faucci Giannelli, G. Kasieczka, B. Nachman,"
+    },
+    {
+      "id": 209,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "D. Salamani, D. Shih and A. Zaborowska, “Fast calorimeter simulation challenge 2022.” https://calochallenge.github.io/homepage/, 2022. [46] GEANT4 collaboration, GEANT4–a simulation toolkit,"
+    },
+    {
+      "id": 210,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Nucl. Instrum. Meth. A 506 (2003) 250. [47] J. Allison, K. Amako, J. Apostolakis, H. Araujo,"
+    },
+    {
+      "id": 211,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "P. Arce Dubois, M. Asai et al., Geant4 developments and applications, IEEE Transactions on Nuclear Science 53 (2006) 270. [48] J. Allison, K. Amako, J. Apostolakis, P. Arce, M. Asai,"
+    },
+    {
+      "id": 212,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Aso et al., Recent developments in geant4, Nuclear Instruments and Methods in Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment 835 (2016) 186. [49] M.F. Giannelli, G. Kasieczka, C. Krause, B. Nachman,"
+    },
+    {
+      "id": 213,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "D. Salamani, D. Shih et al., “Fast calorimeter simulation challenge 2022 - dataset 1.” https://doi.org/10.5281/zenodo.6234054, March, 2022. [50] G. Papamakarios, T. Pavlakou and I. Murray, Masked autoregressive flow for density estimation, Advances in neural information processing systems 30 (2017) [1705.07057]. [51] C. Durkan, A. Bekasov, I. Murray and"
+    },
+    {
+      "id": 214,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Papamakarios, Neural spline flows, Advances in Neural Information Processing Systems 32 (2019) 7511 [1906.04032]. [52] M. Germain, K. Gregor, I. Murray and H. Larochelle,"
+    },
+    {
+      "id": 215,
+      "page": 14,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Made: Masked autoencoder for distribution estimation, in International conference on machine learning, pp. 881–889, PMLR, 2015. [53] D.P. Kingma and J. Ba, Adam: A method for stochastic optimization, 2014. [54] L.N. Smith and N. Topin, Super-convergence: Very fast training of neural networks using large learning rates, in Artificial intelligence and machine learning for multi-domain operations applications, vol. 11006, pp. 369–386, SPIE, 2019. [55] V. Mikuni, B. Nachman and M. Pettee, Fast point cloud generation with diffusion models in high energy physics, Phys. Rev. D 108 (2023) 036025 [2304.01266]. [56] M. Leigh, D. Sengupta, J.A. Raine, G. Qu´etant and"
+    },
+    {
+      "id": 216,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Golling, Faster diffusion model with improved quality for particle cloud generation, Phys. Rev. D 109 (2024) 012010 [2307.06836]. [57] L.N. Smith, Cyclical learning rates for training neural networks, in 2017 IEEE winter conference on applications of computer vision (WACV), pp. 464–472, IEEE, 2017. [58] M.F. Giannelli, G. Kasieczka, C. Krause, B. Nachman,"
+    },
+    {
+      "id": 217,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "D. Salamani, D. Shih et al., “Fast calorimeter simulation challenge 2022 - dataset 3.” https://doi.org/10.5281/zenodo.6366324, March, 2022. [59] C.R. Harris, K.J. Millman, S.J. van der Walt,"
+    },
+    {
+      "id": 218,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "R. Gommers, P. Virtanen, D. Cournapeau et al., Array programming with NumPy, Nature 585 (2020) 357. [60] J.D. Hunter, Matplotlib: A 2d graphics environment,"
+    },
+    {
+      "id": 219,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Computing in Science Engineering 9 (2007) 90. [61] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel,"
+    },
+    {
+      "id": 220,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "B. Thirion, O. Grisel et al., Scikit-learn: Machine learning in Python, Journal of Machine Learning Research 12 (2011) 2825. [62] A. Collette, Python and HDF5, O’Reilly (2013). [63] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury,"
+    },
+    {
+      "id": 221,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Chanan et al., Pytorch: An imperative style, high-performance deep learning library, in Advances in Neural Information Processing Systems 32, H. Wallach, H. Larochelle, A. Beygelzimer, F. Alch´e-Buc, E. Fox and R. Garnett, eds., pp. 8024–8035, Curran Associates, Inc. (2019), http://papers.neurips.cc/paper/9015- pytorch-an-imperative-style-high-performance-deeplearning-library.pdf. [64] C. Durkan, A. Bekasov, I. Murray and"
+    },
+    {
+      "id": 222,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "G. Papamakarios, nflows: normalizing flows in PyTorch, Nov., 2020. 10.5281/zenodo.4296287. [65] E.G. Tabak and C.V. Turner, A family of nonparametric density estimation algorithms, Communications on Pure and Applied Mathematics 66 (2013) 145. [66] L. Dinh, D. Krueger and Y. Bengio, Nice: Non-linear independent components estimation, arXiv preprint arXiv:1410.8516 (2014) . [67] D.J. Rezende and S. Mohamed, Variational inference with normalizing flows, 2015. 10.48550/ARXIV.1505.05770. [68] L. Dinh, J. Sohl-Dickstein and S. Bengio, Density estimation using real nvp, arXiv preprint arXiv:1605.08803 (2016) . [69] G. Papamakarios, E. Nalisnick, D.J. Rezende,"
+    },
+    {
+      "id": 223,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "S. Mohamed and B. Lakshminarayanan, Normalizing flows for probabilistic modeling and inference, . [70] C. Winkler, D.E. Worrall, E. Hoogeboom and"
+    },
+    {
+      "id": 224,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "M. Welling, Learning likelihoods with conditional normalizing flows, CoRR abs/1912.00042 (2019) [1912.00042]. [71] M. Bellagente, A. Butter, G. Kasieczka, T. Plehn,"
+    },
+    {
+      "id": 225,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "A. Rousselot, R. Winterhalder et al., Invertible Networks or Partons to Detector and Back Again, SciPost Phys. 9 (2020) 074 [2006.06685]. [72] J. Brehmer and K. Cranmer, Flows for simultaneous manifold learning and density estimation, 2003.13913. [73] E. Bothmann, T. Janßen, M. Knobbe, T. Schmale and"
+    },
+    {
+      "id": 226,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "S. Schumann, Exploring phase space with Neural Importance Sampling, SciPost Phys. 8 (2020) 069 [2001.05478]. [74] C. Gao, S. H¨oche, J. Isaacson, C. Krause and H. Schulz,"
+    },
+    {
+      "id": 227,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Event Generation with Normalizing Flows, Phys. Rev. D 101 (2020) 076002 [2001.10028]. [75] C. Gao, J. Isaacson and C. Krause, i-flow:"
+    },
+    {
+      "id": 228,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "High-dimensional Integration and Sampling with Normalizing Flows, Mach. Learn. Sci. Tech. 1 (2020) 045023 [2001.05486]. [76] B. Nachman and D. Shih, Anomaly Detection with"
+    },
+    {
+      "id": 229,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Density Estimation, Phys. Rev. D 101 (2020) 075042 [2001.04990]. [77] S. Choi, J. Lim and H. Oh, Data-driven Estimation of"
+    },
+    {
+      "id": 230,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Background Distribution through Neural Autoregressive Flows, 2008.03636. [78] S. Bieringer, A. Butter, T. Heimel, S. H¨oche, U. K¨othe,"
+    },
+    {
+      "id": 231,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Plehn et al., Measuring QCD Splittings with Invertible Networks, SciPost Phys. 10 (2021) 126 [2012.09873]. [79] J. Hollingsworth, M. Ratz, P. Tanedo and D. Whiteson,"
+    },
+    {
+      "id": 232,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Efficient sampling of constrained high-dimensional theoretical spaces with machine learning, Eur. Phys. J. C 81 (2021) 1138 [2103.06957]. [80] R. Winterhalder, M. Bellagente and B. Nachman,"
+    },
+    {
+      "id": 233,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Latent Space Refinement for Deep Generative Models, 2106.00792. [81] A. Hallin, J. Isaacson, G. Kasieczka, C. Krause,"
+    },
+    {
+      "id": 234,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "B. Nachman, T. Quadfasel et al., Classifying anomalies through outer density estimation, Phys. Rev. D 106 (2022) 055006 [2109.00546]. [82] P. Jawahar, T. Aarrestad, N. Chernyavskaya,"
+    },
+    {
+      "id": 235,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "M. Pierini, K.A. Wozniak, J. Ngadiuba et al., Improving Variational Autoencoders for New Physics Detection at the LHC With Normalizing Flows, Front. Big Data 5 (2022) 803685 [2110.08508]. [83] A. Butter, T. Heimel, S. Hummerich, T. Krebs,"
+    },
+    {
+      "id": 236,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Plehn, A. Rousselot et al., Generative networks for precision enthusiasts, SciPost Phys. 14 (2023) 078 [2110.13632]. [84] R. Winterhalder, V. Magerya, E. Villa, S.P. Jones,"
+    },
+    {
+      "id": 237,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "M. Kerner, A. Butter et al., Targeting Multi-Loop Integrals with Neural Networks, SciPost Phys. 12 (2022) 129 [2112.09145]. [85] A. Butter, S. Diefenbacher, G. Kasieczka, B. Nachman,"
+    },
+    {
+      "id": 238,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "T. Plehn, D. Shih et al., Ephemeral Learning - Augmenting Triggers with Online-Trained Normalizing Flows, SciPost Phys. 13 (2022) 087 [2202.09375]. [86] R. Verheyen, Event Generation and Density Estimation with Surjective Normalizing Flows, SciPost Phys. 13 (2022) 047 [2205.01697]. [87] M. Leigh, J.A. Raine, K. Zoch and T. Golling, ν-flows:"
+    },
+    {
+      "id": 239,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Conditional neutrino regression, SciPost Phys. 14 (2023) 159 [2207.00664]. [88] B. K¨ach, D. Kr¨ucker, I. Melzer-Pellmann, M. Scham,"
+    },
+    {
+      "id": 240,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "S. Schnake and A. Verney-Provatas, JetFlow: Generating Jets with Conditioned and Mass Constrained Normalising Flows, 2211.13630. [89] B. K¨ach, D. Kr¨ucker and I. Melzer-Pellmann, Point"
+    },
+    {
+      "id": 241,
+      "page": 15,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Cloud Generation using Transformer Encoders and Normalising Flows, 2211.13623. [90] M.J. Dolan and A. Ore, Disentangling quark and gluon jets with normalizing flows, Phys. Rev. D 107 (2023) 114003 [2211.16053]. [91] M. Backes, A. Butter, M. Dunford and B. Malaescu, An unfolding method based on conditional invertible neural networks (cINN) using iterative training, SciPost Phys. Core 7 (2024) 007 [2212.08674]."
+    },
+    {
+      "id": 242,
+      "page": 16,
+      "section": "Appendix C: Classifier architecture",
+      "text": "[92] T. Heimel, R. Winterhalder, A. Butter, J. Isaacson,"
+    },
+    {
+      "id": 243,
+      "page": 16,
+      "section": "Appendix C: Classifier architecture",
+      "text": "C. Krause, F. Maltoni et al., MadNIS – Neural Multi-Channel Importance Sampling, 2212.06172. [93] M. Algren, T. Golling, M. Guth, C. Pollard and"
+    },
+    {
+      "id": 244,
+      "page": 16,
+      "section": "Appendix C: Classifier architecture",
+      "text": "J.A. Raine, Flow Away your Differences: Conditional Normalizing Flows as an Improvement to Reweighting, 2304.14963. [94] B. Nachman and R. Winterhalder, Elsa: enhanced latent spaces for improved collider simulations, Eur. Phys. J. C 83 (2023) 843 [2305.07696]. [95] J.A. Raine, M. Leigh, K. Zoch and T. Golling, Fast and improved neutrino reconstruction in multineutrino final states with conditional normalizing flows, Phys. Rev. D 109 (2024) 012005 [2307.02405]. [96] C. Guo, G. Pleiss, Y. Sun and K.Q. Weinberger, On"
+    },
+    {
+      "id": 245,
+      "page": 16,
+      "section": "Appendix C: Classifier architecture",
+      "text": "Calibration of Modern Neural Networks, arXiv e-prints (2017) arXiv:1706.04599 [1706.04599]."
+    }
+  ],
+  "skipped_pages": []
+}

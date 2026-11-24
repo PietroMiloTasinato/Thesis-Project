@@ -1,0 +1,512 @@
+{
+  "source": "p2402.11575v1.pdf",
+  "title": null,
+  "num_pages": 10,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "with irregular geometry",
+      "text": "Dmitrii Kobylianskii,∗Nathalie Soybelman, Etienne Dreyer, and Eilam Gross"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "with irregular geometry",
+      "text": "Weizmann Institute of Science, Israel"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "with irregular geometry",
+      "text": "(Dated: February 20, 2024)"
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "with irregular geometry",
+      "text": "Denoising diffusion models have gained prominence in various generative tasks, prompting their exploration for the generation of calorimeter responses. Given the computational challenges posed by detector simulations in high-energy physics experiments, the necessity to explore new machinelearning-based approaches is evident. This study introduces a novel graph-based diffusion model designed specifically for rapid calorimeter simulations. The methodology is particularly well-suited for low-granularity detectors featuring irregular geometries. We apply this model to the ATLAS dataset published in the context of the Fast Calorimeter Simulation Challenge 2022, marking the first application of a graph diffusion model in the field of particle physics."
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Simulation plays an essential role in interpreting collision data from the Large Hadron Collider (LHC) experiments and testing alignment with theoretical predictions. The unique set of challenges entailed in simulating collision data, including high-dimensional feature space and lack of tractable likelihood models, have inspired a range of deep learning solutions [1, 2]. In particular, for simulating particle interactions in the detector, the core challenge is limited computational resources, dominated by the extreme detail needed to model particle showers in the calorimeter. Here, the traditional approach of Monte Carlo simulation based on Geant4 [3] is robust but highly resource intensive – occupying the largest fraction of time in the ATLAS simulation chain [4]. In future high-luminosity LHC runs, calorimeter simulations will need to cope with an order of magnitude higher data rate, potentially becoming the limiting factor for physics analysis without significant progress in the field [5]."
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Many efforts have been employed in order to speed up calorimeter simulations significantly. While fast parameterized shower models have been successfully deployed at LHC experiments [6, 7], they are limited in accuracy. More recently, the emergence of deep generative models has led to their great popularity and potential in tackling this task. The first generative model applied to calorimeter simulations was CaloGAN [8]. It represented the calorimeter as a 3D image and used a Generative Adversarial Network (GAN) to generate them. Building on the success of this work, GANs were already implemented in the ATLAS fast simulation AtlFast3 [9]."
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "New developments in the field of generative models bringing new models to the market triggered a multitude of new developments for calorimeter simulations [10–19]. The Fast Calorimeter Simulation Challenge 2022 [20–22] was developed to provide a framework for a comparison of all ongoing efforts. Normalizing flows (NFs) and invertible neural networks (INNs), as well as various diffusion-based models, showed promising results, while often exhibiting a compromise between accuracy and speed. Beyond the choice of network architecture, the data representation poses an important aspect as well. While, for example, CaloScore [15, 16] and CaloDiffusion [12] rely on image representation, CaloClouds [10, 11] and CaloFlow [19] utilize point clouds. Point clouds offer a natural representation of calorimeters and particle physics data in general. Generative models of point clouds proved their effectiveness in the task of jet simulations [23–27], where each point represents a jet constituent. For calorimeter simulations, points represent energy depositions. Such a representation is independent of the underlying geometry and, therefore, computationally more efficient than a sparse 3d image. However, voxelization needs to be applied to convert the point cloud into detector cells, which can introduce a bias and affect the performance. This method is, therefore, mostly suitable for high-granularity calorimeters, for example, at the proposed CLIC detector [28]."
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "In this work, we propose CaloGraph: a denoising diffusion model that represents calorimeter data as a graph, as shown in Fig. 1. Graph neural networks (GNNs) showed wide success in HEP applications [29], including clustering tracking detector hits into tracks [30–32] or classifying jets based on constituents [33–35]. Particularly, graph representations of calorimeters are used for the reconstruction of particle flow candidates [36–38]. Until now, their use for generative tasks remained unexplored. The motivation for a graph representation of the calorimeter is similar to the"
+    },
+    {
+      "id": 9,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "FIG. 1: Event display from the pion dataset in graph form. The nodes represent voxels, and their size relates monotonically to the deposited energy. Each colour represents a different calorimeter layer."
+    },
+    {
+      "id": 10,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "one for point clouds, with the additional advantage of edges incorporating relations between neighbouring objects and allowing information transfer. Furthermore, unlike the point cloud, the graph structure is fixed, and nodes directly represent detector cells, avoiding the need for voxelization and associated performance losses. However, a large number of edges will lead to a significant memory need, posing a limitation to this method for high-granularity detectors. In most inference tasks with GNNs, the number of nodes is predefined by the input graph, whereas in our case, nodes with nonzero energy are predicted by the generation task and thus not known in advance. It is therefore necessary to define a fixed initial graph that sets an upper limit on the number of nodes with nonzero energy. We therefore present results for the ATLAS-like dataset 1 of the calorimeter challenge [20]."
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "We note that applications of graph-based diffusion have thus far been restricted to generation of molecules, proteins, and materials [39]. Typically in these cases, the network is used to predict the graph adjacency matrix and also node and edge features in some cases [40]. In our application, we take the graph structure as given and only predict node features with the diffusion model."
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "CaloGraph was trained and evaluated using Dataset 1 from the Fast Calorimeter Simulation Challenge 2022 [20]. This dataset comprises Geant4-simulated particle showers in a model of the ATLAS calorimeter and was used to train AtlFast3 [9]. The dataset comprises two sets of calorimeter showers—one for photons and one for pions."
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "The calorimeter consists of 533 voxels and 7 layers in the case of the pion dataset and 368 voxels and 5 layers for photons. The voxelization leads to an irregular distribution of radial and angular bins Nr × Nα among the layers given as follows:"
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "pions 8 × 1, 10 × 10, 10 × 10, 5 × 1, 5 × 1, 15 × 10, 16 × 10, 10 × 1 photons 8 × 1, 16 × 10, 19 × 10, 5 × 1, 5 × 1 (1)"
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "Photon and pion energies range from 256 MeV to 4.2 TeV, increasing in powers of two. For each energy level, 10,000 showers are provided, with a reduced amount for very high energies. In total 242,000 (241,600) showers are provided for the photon (pion) dataset."
+    },
+    {
+      "id": 16,
+      "page": 3,
+      "section": "A. Graph creation",
+      "text": "Each calorimeter shower is represented by a graph in the following way. An example from the pion sample is shown in Fig. 1. The graph nodes depict the calorimeter voxels with the fixed coordinates {ηi, ϕi, layeri} as input features and the deposited energy Ei as ground truth. As shown, the voxels comprise rings of equal Ri = i which are used to determine the graph edges. Each voxel is connected to its two neighbouring voxels on the same ring and up to two nearest neighbors on concentric rings. Connections between layers occur for voxels located in the outermost and innermost rings in terms of R. In layers without angular binning, the rings each correspond to a single voxel and are connected concentrically, as depicted by straight lines in Fig. 1. The innermost voxels in these layers are connected to the innermost ring of voxels in the layers below and above, where available. In total, we have 1478 (2210) edges for the photon (pion) graphs."
+    },
+    {
+      "id": 17,
+      "page": 3,
+      "section": "B. Data preprocessing",
+      "text": "Before the network operates on the graph, a normalization process is applied to the node features. The η and ϕ coordinates are normalized to achieve a zero mean and a standard deviation of 1. The energy normalization process is illustrated in the pseudo-code of Algorithm 1. The deposited energies in the voxels Ei are normalized relative to the incoming energy Einc with an additional factor f = 3.1 for photons and f = 6.4 for pions. This factor is essential to account for scenarios where Einc is less than Ei. Following this, a logit transform is executed with α = 10−6. Finally, the resulting values undergo further normalization to obtain a zero mean and a standard deviation of 1. The incoming energy Einc undergoes min-max normalization to be in the range [0, 1]."
+    },
+    {
+      "id": 18,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "CaloGraph is a score-based graph diffusion model, where a diffusion process is designed to perturb the original node features x slowly with Gaussian noise addition. The neural network learns to undo the noising process by estimating the amount of noise added ϵt and solving the corresponding differential equation. In this way, we can start from pure noise xT ∼N(0, I) and sequentially denoise it to sample from the original data distribution x0 ∼pdata."
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "The diffusion formulation of CaloGraph follows the DDIM approach [41] closely. We take as input a noised graph with disturbed energy Et = √¯αtE0 + √1 −¯αtϵ, where t is the diffusion time step, ϵ ∼N(0, I) and ¯αt are given by a cosine noise schedule adopted from [42]. During training, the GNN learns to predict the added noise ϵ conditioned on the voxel coordinates C and the incoming particle energy Einc. The loss is defined as:"
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "During the inference process, we start with the graph, where the deposited energies are given by pure noise ET ∼ N(0, I). Then, we use our network and the PNDM sampler from [43] to estimate the noise needed to be removed to iteratively denoise the deposited energy. The CaloGraph architecture is depicted in Fig. 2. The network takes as input the noised target graph with the node features, including the cell positions (ηi, ϕi, layeri) and the noised cell energy Et as described above. Initially, the cell layer undergoes an update through a learnable embedding. Following this, both position and noised energy are processed through a multi-layer perceptron (MLP). The updated node features are then combined with the conditional input, comprising the embedded, uniformly sampled time step and the incoming particle energy updated via another MLP. The resulting combined output is passed through another MLP, giving the updated graph. Subsequently, four rounds of message-passing neural networks (MPNN) [44] are"
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "Algorithm 1: Deposited energy normalization procedure"
+    },
+    {
+      "id": 22,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "1: procedure Normalize(Ei, Einc) 2:"
+    },
+    {
+      "id": 23,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "6: return E′"
+    },
+    {
+      "id": 24,
+      "page": 3,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "▷Return normalized energy 7: end procedure"
+    },
+    {
+      "id": 25,
+      "page": 4,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "FIG. 2: Architecture of CaloGraph. The input noised graph is updated with the embedded conditional input comprised of the sampled time step and the incoming particle energy. Message-passing is applied on the updated graph, and the output is combined with the conditional input and the pre-message-passing node features to predict the noise."
+    },
+    {
+      "id": 26,
+      "page": 4,
+      "section": "III. MODEL DESCRIPTION",
+      "text": "applied. The output of the message passing is combined through a skip connection with the input to the MPNN and the conditional input. The resulting node representation vectors are passed through the final MLP to predict the noise. We trained separate models for the photon and pion samples using the same architecture and hyperparameters shown in Tab. I, without dedicated optimization. The models were implemented using PyTorch and DGL (Deep Graph Library) [45]."
+    },
+    {
+      "id": 27,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "To evaluate the performance of CaloGraph, we consider different high-level features that reflect how well the shower shapes are learned. We can define the centre of energy and its width for a layer n in the angular direction η:"
+    },
+    {
+      "id": 28,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "where the sum over i goes over all layer voxels and Ei is the generated energy deposition of voxel i. We show these quantities for layer 2 in the upper panels of Fig. 3 for the photon test dataset and respectively Fig. 4 for the pion test dataset. The distributions are modelled well for both datasets, with a percent-level discrepancy with respect to the Geant4 baseline. The peak at 0 width stems from events that have at most one active cell in the layer."
+    },
+    {
+      "id": 29,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "The lower panels give insights into the energy modelling. On the left, we see the energy distribution in layer 2. For the photon sample, we see steps in the histogram at high energies, which are an artefact of the discrete incoming energies in the dataset. Apart from the discrepancy in some of those bins, the network learns to reproduce the correct"
+    },
+    {
+      "id": 30,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "Hyperparameters batch size 200 optimizer AdamW lr 10−3"
+    },
+    {
+      "id": 31,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "# of epochs 700 # of time steps 50"
+    },
+    {
+      "id": 32,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "Network sub-parts Parameters Embedding part 155 710 MPNN (4 rounds) 519 750 Noise predictor 148 157"
+    },
+    {
+      "id": 33,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "Total 823 617"
+    },
+    {
+      "id": 34,
+      "page": 4,
+      "section": "IV. RESULTS",
+      "text": "TABLE I: Network hyperparameters of the CaloGraph model"
+    },
+    {
+      "id": 35,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "Center of Energy in in layer 2"
+    },
+    {
+      "id": 36,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 37,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 38,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "E2 [MeV]"
+    },
+    {
+      "id": 39,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "Width of Center of Energy in in layer 2"
+    },
+    {
+      "id": 40,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 41,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 42,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "0.6 0.8 1.0 1.2 1.4 Etot/Einc"
+    },
+    {
+      "id": 43,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "FIG. 3: Distribution high-level features in the photons sample."
+    },
+    {
+      "id": 44,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "distribution. The same can be said for the pion dataset, except for the mismodelling at energies below 500 MeV. A shortcoming of the network can be observed in the total energy modelling. For the photon dataset, the Geant4 distribution of the total deposited energy normalized over the incoming energy is sharply peaked near 1. The network prediction is similarly peaked but creates a wider distribution. This can be seen in more detail in Fig. 5, where the ratio is shown for different incident energies. The modelling is better for low incident energies where the distributions are wider. The performance on the pion dataset is better. Due to non-compensation and larger energy fluctuations associated with hadronic showers, the total energy distribution is wider than for photons and is captured better by the network. Overall, we have, at most, a discrepancy of 15% in the bulk of the data. The distributions for separated incident energies in Fig. 6 are well-modelled for all energies above 500 MeV, the energy region that appears to be problematic also for the per-layer distributions."
+    },
+    {
+      "id": 45,
+      "page": 5,
+      "section": "IV. RESULTS",
+      "text": "An additional useful metric for the evaluation of a generative model is the performance of a binary classifier trained to distinguish between Geant4 and generated samples. The better the generative model, the harder it is to distinguish them, and the worse the performance of the classifier. We train two different classifiers for each dataset, one using low-level features and the other using high-level features. For both cases, the network is a simple MLP with two hidden layers with a size of 512. The low-level classifier takes as input only the incoming energy and the voxel energies as a list. For the high-level features, the network focuses more on the shower shape variables than on the energy values only. We combine the centres of energy and their widths in η and ϕ, which are defined in analogy to Eq. 3, together with the deposited energies in each layer and the incoming energy and pass it as input to the classifier. The classifiers are trained on a sample containing equal proportions of showers from CaloGraph and Geant4. The area under the receiver operating characteristic curve (AUC) for the different classifiers for the pion and photon dataset are displayed in Tab. II. A perfect generative model would result in an AUC of 0.5. For both datasets, the high-level classifier shows better results than the low-level one, reflecting the previously discussed observation that the network correctly learns"
+    },
+    {
+      "id": 46,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "Center of Energy in in layer 2"
+    },
+    {
+      "id": 47,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 48,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 49,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "E2 [MeV]"
+    },
+    {
+      "id": 50,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "Width of Center of Energy in in layer 2"
+    },
+    {
+      "id": 51,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 52,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "GEANT4 CaloGraph"
+    },
+    {
+      "id": 53,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "0.6 0.8 1.0 1.2 1.4 Etot/Einc"
+    },
+    {
+      "id": 54,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "FIG. 4: Distribution high-level features in the pions sample."
+    },
+    {
+      "id": 55,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "the shower shape, whereas the total energy prediction shows room for improvement. We can understand that, in this case, the AUC on the photon dataset is lower than for the pions since the lower number of voxels makes it easier to learn the shape. We find that the low-level classifiers’ performance is comparable for both datasets."
+    },
+    {
+      "id": 56,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "In addition to the accuracy of shower generation, it is critical to look at the timing. In the tstacarch for fast surrogates, we want to minimize the generation time per shower as much as possible. In general, while diffusion models exceed competitive approaches in performance, their disadvantage is the slow generation time caused by the iterative process of noise removal. This can be mitigated with innovative sampling methods [46], for example, progressive distillation as in [16]. The method involves training an additional model that learns to halve the steps each time, which significantly speeds up the generation but features a loss in performance. For CaloGraph, however, further speedup does not seem necessary. The generation times per shower for both datasets are depicted in Tab. III for different batch sizes on CPU and GPU. We attribute our low inference time to the efficient graph representation of the data and the small size of the network compared to other diffusion models."
+    },
+    {
+      "id": 57,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "Dataset Low-level features High-level features photons 0.81 0.63 pions 0.80 0.72"
+    },
+    {
+      "id": 58,
+      "page": 6,
+      "section": "IV. RESULTS",
+      "text": "TABLE II: The AUC values for the DNN classifier trained to distinguish GEANT4 and generated showers for both datasets."
+    },
+    {
+      "id": 59,
+      "page": 7,
+      "section": "IV. RESULTS",
+      "text": "FIG. 5: Ratio of total energy to the discrete values of Einc in the photons sample."
+    },
+    {
+      "id": 60,
+      "page": 7,
+      "section": "V. CONCLUSION",
+      "text": "We presented a novel diffusion model utilizing a graph neural network for the task of generating calorimeter showers and demonstrated the performance on the photon and pion dataset 1 of the Fast Calorimeter Simulation Challenge 2022. In the case of irregular cell geometry, representing the calorimeter as a graph simplifies the pre- and postprocessing of the input data significantly and allows the generation of correct shower shapes due to the graph connectivity and the passage of information between neighbouring cells. Despite the use of diffusion, the inference time is fast due to the compactness of the model. A shortcoming of the approach is the slight mismodeling of the total deposited energy, especially in cases where it follows a sharp distribution, as in the photon dataset. This can potentially be mitigated in future work by adding a network that predicts the total energy per layer before diffusing it among the photons pions Batch size GPU CPU GPU CPU"
+    },
+    {
+      "id": 61,
+      "page": 7,
+      "section": "V. CONCLUSION",
+      "text": "TABLE III: Generation time per shower in seconds for different batch sizes for both datasets. The GPU studies were run on an NVIDIA TITAN RTX with 24GB VRAM, and for the CPU on an Intel(R) Xeon(R) Gold 6234 at"
+    },
+    {
+      "id": 62,
+      "page": 7,
+      "section": "V. CONCLUSION",
+      "text": "3.30GHz"
+    },
+    {
+      "id": 63,
+      "page": 8,
+      "section": "V. CONCLUSION",
+      "text": "FIG. 6: Ratio of total energy to the discrete values of Einc in the pions sample."
+    },
+    {
+      "id": 64,
+      "page": 8,
+      "section": "V. CONCLUSION",
+      "text": "voxels. We also note that with the graph structure connecting all nearest neighbours, this model can primarily be used for low-granularity detectors only. Considering different connectivity, significantly reducing the number of edges and, therefore, also the memory usage might allow a generalization of the method."
+    },
+    {
+      "id": 65,
+      "page": 8,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "We are grateful for the support provided by the collaborative Weizmann Institute and MBZUAI research grant, as well as the Benoziyo Center for High Energy Physics. Special thanks go to our colleagues at MBZUAI, especially Shangsong Liang and Ruihong Zeng, for their insightful discussions. We also extend our gratitude to Edward Shields for his valuable contribution."
+    },
+    {
+      "id": 66,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "[1] A. Butter, T. Plehn, S. Schumann, S. Badger, S. Caron, et al., Machine learning and LHC event generation, SciPost Phys."
+    },
+    {
+      "id": 67,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "14, 079 (2023). [2] H. Hashemi and C. Krause, Deep Generative Models for Detector Signature Simulation: An Analytical Taxonomy, (2023), arXiv:2312.09597 [physics.ins-det]. [3] S. Agostinelli et al. (GEANT4), GEANT4: A simulation toolkit, Nucl. Instrum. Meth. A506, 250 (2003). [4] ATLAS Collaboration, The ATLAS Simulation Infrastructure, Eur. Phys. J. C 70, 823 (2010). [5] O. Br¨uning, H. Gray, K. Klein, M. Lamont, M. Narain, R. Polifka, and L. Rossi, The scientific potential and technological challenges of the High-Luminosity Large Hadron Collider program, Rept. Prog. Phys. 85, 046201 (2022). [6] M. P. Heath (ATLAS), The new ATLAS Fast Calorimeter Simulation, PoS EPS-HEP2017, 792 (2018). [7] A. Giammanco, The Fast Simulation of the CMS Experiment, J. Phys. Conf. Ser. 513, 022012 (2014). [8] M. Paganini, L. de Oliveira, and B. Nachman, CaloGAN : Simulating 3D high energy particle showers in multilayer electromagnetic calorimeters with generative adversarial networks, Phys. Rev. D 97, 014021 (2018), arXiv:1712.10321 [hep-ex]. [9] G. Aad et al. (ATLAS), AtlFast3: the next generation of fast simulation in ATLAS, Comput. Softw. Big Sci. 6, 7 (2022), arXiv:2109.02551 [hep-ex]. [10] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol, W. Korcari, K. Kr¨uger, and P. McKeown,"
+    },
+    {
+      "id": 68,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "CaloClouds: fast geometry-independent highly-granular calorimeter simulation, JINST 18 (11), P11025, arXiv:2305.04847 [physics.ins-det]. [11] E. Buhmann, F. Gaede, G. Kasieczka, A. Korol, W. Korcari, K. Kr¨uger, and P. McKeown, CaloClouds II: Ultra-Fast"
+    },
+    {
+      "id": 69,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "Geometry-Independent Highly-Granular Calorimeter Simulation, (2023), arXiv:2309.05704 [physics.ins-det]. [12] O. Amram and K. Pedro, CaloDiffusion with GLaM for High Fidelity Calorimeter Simulation, (2023), arXiv:2308.03876"
+    },
+    {
+      "id": 70,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "[physics.ins-det]. [13] C. Krause, I. Pang, and D. Shih, CaloFlow for CaloChallenge Dataset 1, (2022), arXiv:2210.14245 [physics.ins-det]. [14] F. Ernst, L. Favaro, C. Krause, T. Plehn, and D. Shih, Normalizing Flows for High-Dimensional Detector Simulations,"
+    },
+    {
+      "id": 71,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "(2023), arXiv:2312.09290 [hep-ph]. [15] V. Mikuni and B. Nachman, Score-based generative models for calorimeter shower simulation, Phys. Rev. D 106, 092009"
+    },
+    {
+      "id": 72,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "(2022), arXiv:2206.11898 [hep-ph]. [16] V. Mikuni and B. Nachman, CaloScore v2: Single-shot Calorimeter Shower Simulation with Diffusion Models, (2023), arXiv:2308.03847 [hep-ph]. [17] M. Faucci Giannelli and R. Zhang, CaloShowerGAN, a Generative Adversarial Networks model for fast calorimeter shower simulation, (2023), arXiv:2309.06515 [physics.ins-det]. [18] I. Pang, J. A. Raine, and D. Shih, SuperCalo: Calorimeter shower super-resolution, (2023), arXiv:2308.11700 [physics.insdet]. [19] M. R. Buckley, C. Krause, I. Pang, and D. Shih, Inductive CaloFlow, (2023), arXiv:2305.11934 [physics.ins-det]. [20] M. F. Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska, Fast Calorimeter"
+    },
+    {
+      "id": 73,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "Simulation Challenge 2022 - Dataset 1, 10.5281/zenodo.6368338 (2022). [21] M. Faucci Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska, Fast Calorimeter"
+    },
+    {
+      "id": 74,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "Simulation Challenge 2022 - Dataset 2, 10.5281/zenodo.6366271 (2022). [22] M. Faucci Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska, Fast Calorimeter"
+    },
+    {
+      "id": 75,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "Simulation Challenge 2022 - Dataset 3, 10.5281/zenodo.6366324 (2022). [23] V. Mikuni, B. Nachman, and M. Pettee, Fast point cloud generation with diffusion models in high energy physics, Phys."
+    },
+    {
+      "id": 76,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "Rev. D 108, 036025 (2023), arXiv:2304.01266 [hep-ph]. [24] E. Buhmann, C. Ewen, D. A. Faroughy, T. Golling, G. Kasieczka, M. Leigh, G. Qu´etant, J. A. Raine, D. Sengupta, and"
+    },
+    {
+      "id": 77,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "D. Shih, EPiC-ly Fast Particle Cloud Generation with Flow-Matching and Diffusion, (2023), arXiv:2310.00049 [hep-ph]. [25] E. Buhmann, G. Kasieczka, and J. Thaler, EPiC-GAN: Equivariant Point Cloud Generation for Particle Jets, (2023), arXiv:2301.08128 [hep-ph]. [26] M. Leigh, D. Sengupta, J. A. Raine, G. Qu´etant, and T. Golling, PC-Droid: Faster diffusion and improved quality for particle cloud generation, (2023), arXiv:2307.06836 [hep-ex]. [27] B. K¨ach, D. Kr¨ucker, and I. Melzer-Pellmann, Point cloud generation using transformer encoders and normalising flows"
+    },
+    {
+      "id": 78,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "(2022), arXiv:2211.13623 [hep-ex]. [28] F. Simon, Detector Systems at CLIC, Phys. Procedia 37, 63 (2012), arXiv:1109.3387 [physics.ins-det]. [29] J. Shlomi, P. Battaglia, and j.-r. vlimant, Graph neural networks in particle physics, Machine Learning: Science and"
+    },
+    {
+      "id": 79,
+      "page": 9,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "Technology 10.1088/2632-2153/abbf9a (2020). [30] G. DeZoort, S. Thais, J. Duarte, V. Razavimaleki, M. Atkinson, I. Ojalvo, M. Neubauer, and P. Elmer, Charged particle tracking via edge-classifying interaction networks, Computing and Software for Big Science 5, 10.1007/s41781-021-00073-z (2021). [31] D. Murnane, S. Thais, and A. Thete, Equivariant graph neural networks for charged particle tracking (2023), arXiv:2304.05293 [physics.ins-det]. [32] R. Liu, P. Calafiura, S. Farrell, X. Ju, D. T. Murnane, and T. M. Pham, Hierarchical graph neural networks for particle track reconstruction (2023), arXiv:2303.01640 [hep-ex]."
+    },
+    {
+      "id": 80,
+      "page": 10,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "[33] F. Ma, F. Liu, and W. Li, Jet tagging algorithm of graph network with haar pooling message passing, Physical Review D"
+    },
+    {
+      "id": 81,
+      "page": 10,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "108, 10.1103/physrevd.108.072007 (2023). [34] S. Gong, Q. Meng, J. Zhang, H. Qu, C. Li, S. Qian, W. Du, Z.-M. Ma, and T.-Y. Liu, An efficient lorentz equivariant graph neural network for jet tagging, Journal of High Energy Physics 2022, 10.1007/jhep07(2022)030 (2022). [35] Graph Neural Network Jet Flavour Tagging with the ATLAS Detector, Tech. Rep. (CERN, Geneva, 2022) all figures including auxiliary figures are available at https://atlas.web.cern.ch/Atlas/GROUPS/PHYSICS/PUBNOTES/ATL-PHYS- PUB-2022-027. [36] J. Pata, J. Duarte, F. Mokhtar, E. Wulff, J. Yoo, J.-R. Vlimant, M. Pierini, and M. Girone, Machine learning for particle flow reconstruction at CMS, Journal of Physics: Conference Series 2438, 012100 (2023). [37] J. Pata, J. Duarte, J.-R. Vlimant, M. Pierini, and M. Spiropulu, MLPF: efficient machine-learned particle-flow reconstruction using graph neural networks, The European Physical Journal C 81, 10.1140/epjc/s10052-021-09158-w (2021). [38] F. A. Di Bello, E. Dreyer, S. Ganguly, E. Gross, L. Heinrich, A. Ivina, M. Kado, N. Kakati, L. Santi, J. Shlomi, and"
+    },
+    {
+      "id": 82,
+      "page": 10,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "M. Tusoni, Reconstructing particles in jets using set transformer and hypergraph prediction networks, The European Physical Journal C 83, 10.1140/epjc/s10052-023-11677-7 (2023). [39] C. Liu, W. Fan, Y. Liu, J. Li, H. Li, H. Liu, J. Tang, and Q. Li, Generative diffusion models on graphs: Methods and applications, in Proceedings of the Thirty-Second International Joint Conference on Artificial Intelligence, IJCAI-23 (International Joint Conferences on Artificial Intelligence Organization, 2023) pp. 6702–6711. [40] M. Xu, A. Powers, R. Dror, S. Ermon, and J. Leskovec, Geometric latent diffusion models for 3d molecule generation"
+    },
+    {
+      "id": 83,
+      "page": 10,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "(2023), arXiv:2305.01140 [cs.LG]. [41] J. Song, C. Meng, and S. Ermon, Denoising diffusion implicit models, CoRR abs/2010.02502 (2020), 2010.02502. [42] A. Q. Nichol and P. Dhariwal, Improved denoising diffusion probabilistic models, in Proceedings of the 38th International Conference on Machine Learning, Proceedings of Machine Learning Research, Vol. 139 (PMLR, 2021) p. 8162, arXiv:2102.09672 [cs.LG]. [43] L. Liu, Y. Ren, Z. Lin, and Z. Zhao, Pseudo Numerical Methods for Diffusion Models on Manifolds (2022), arXiv:2202.09778. [44] J. Gilmer, S. S. Schoenholz, P. F. Riley, O. Vinyals, and G. E. Dahl, Neural message passing for quantum chemistry (2017), arXiv:1704.01212 [cs.LG]. [45] M. Wang, D. Zheng, Z. Ye, Q. Gan, M. Li, X. Song, J. Zhou, C. Ma, L. Yu, Y. Gai, T. Xiao, T. He, G. Karypis,"
+    },
+    {
+      "id": 84,
+      "page": 10,
+      "section": "ACKNOWLEDGEMENT",
+      "text": "J. Li, and Z. Zhang, Deep graph library: A graph-centric, highly-performant package for graph neural networks (2020), arXiv:1909.01315 [cs.LG]. [46] C. Jiang, S. Qian, and H. Qu, Choose Your Diffusion: Efficient and flexible ways to accelerate the diffusion model in fast high energy physics simulation, (2024), arXiv:2401.13162 [physics.ins-det]."
+    }
+  ],
+  "skipped_pages": []
+}

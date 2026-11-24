@@ -1,0 +1,1022 @@
+{
+  "source": "p1807.01954v2.pdf",
+  "title": null,
+  "num_pages": 20,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": null,
+      "text": "Post-peer-review, pre-copyedit version."
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Network",
+      "text": "Martin Erdmanna Jonas Glombitzaa Thorben Quasta,b aIII. Physikalisches Institut A, Rheinisch Westfälische Technische Hochschule,"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Network",
+      "text": "Aachen, Germany bEP-LCD, CERN,"
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "Network",
+      "text": "Geneva, Switzerland"
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "Network",
+      "text": "E-mail: thorben.quast@cern.ch"
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "Network",
+      "text": "Abstract: Simulations of particle showers in calorimeters are computationally time-consuming, as they have to reproduce both energy depositions and their considerable ﬂuctuations. A new approach to ultra-fast simulations are generative models where all calorimeter energy depositions are generated simultaneously. We use GEANT4 simulations of an electron beam impinging on a multi-layer electromagnetic calorimeter for adversarial training of a generator network and a critic network guided by the Wasserstein distance. The generator is constraint during the training such that the generated showers show the expected dependency on the initial energy and the impact position. It produces realistic calorimeter energy depositions, ﬂuctuations and correlations which we demonstrate in distributions of typical calorimeter observables. In most aspects, we observe that generated calorimeter showers reach the level of showers as simulated with the GEANT4 program."
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "Network",
+      "text": "Keywords: Deep learning, Adversarial networks, Wasserstein distance, Detector, Simulation"
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "Network",
+      "text": "ArXiv ePrint: 1807.01954"
+    },
+    {
+      "id": 9,
+      "page": 1,
+      "section": "Network",
+      "text": "This is a post-peer-review, pre-copyedit version of an article published in Computing and Software for Big Science 3, 4 (2019). The ﬁnal authenticated version is available online at: 10.1007/s41781-018-0019-7."
+    },
+    {
+      "id": 10,
+      "page": 2,
+      "section": "1 Introduction 1",
+      "text": "2 Experimental setup 3 2.1 Calorimeter conﬁguration 3 2.2 Reference dataset 4"
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "1 Introduction 1",
+      "text": "3 Fast simulation approach 5 3.1 Generative adversarial networks (GANs) 5 3.2 Wasserstein GANs 5 3.3 Label conditioning 6 3.4 Strategy and network training 7"
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "1 Introduction 1",
+      "text": "4 Performance benchmarks 9 4.1 Visual inspection of generated showers 10 4.2 Label dependency 10 4.3 Calorimeter observables 10 4.3.1 Distributions of calorimeter observables 10 4.3.2 Correlations 12 4.4 Computational speed-up 13"
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "Calorimeter showers initiated by a primary particle can be understood as a sequence of stochastic interaction processes of the primary and all secondary particles with the material. The fourdimensional spatial and temporal development of the shower and its energy depositions can be described with good accuracy by numerical methods taking into account the relevant cross sections, e.g., using the GEANT4 program [1–3]. Sequential simulations of particle showers, however, require signiﬁcant computing resources."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "1 Introduction",
+      "text": "The most recent approach for simulating particle showers in calorimeters are so-called generative adversarial networks (GAN) [4–8]. According to this concept, the temporal sequence of the shower development is ﬁrst marginalized by training a generator and the three-dimensional spatial distribution of the energy depositions is then generated directly. At ﬁrst glance, this ansatz appears similar to common detector-speciﬁc parameterizations of detailed simulations which are usually developed by experts in the ﬁeld. With the GAN concept, however, a high-dimensional probability distribution for spatial energy depositions is obtained automatically either directly from measured data, or alternatively from the above-mentioned detailed simulations."
+    },
+    {
+      "id": 15,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "In order to produce libraries of network-generated particle showers with the relevant properties of measured showers, the probability distribution of realistic energy depositions needs to be encoded in the numerous trainable parameters of the network. The key challenge is to build a converging framework which is capable of approximating the entire high-dimensional probability distribution."
+    },
+    {
+      "id": 16,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "In contrast to the above-mentioned sequential shower simulations, which calculate many stochastic processes of individual interactions, the entire spatial energy depositions of the shower are determined in a single evaluation of the generator network. In order to obtain the realization of a single shower, the stochastic process is incorporated through a set of random numbers on input to the probability distribution coded in the network. These random numbers ensure that none of the generated particle showers look alike. The speed for calculating a shower realization is several orders of magnitude faster than detailed shower simulations, since in the network only a ﬁxed sequence of linear algebra operations is carried out together with the evaluation of the activation functions."
+    },
+    {
+      "id": 17,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "Current research is assessing methods of training the generator to learn the high-dimensional probability distribution for calorimeter energy depositions. The GAN concept consists of two networks working in opposition to one another. The generator network is meant to learn the probability distribution which is encoded in realistic data sets. The second network is used to evaluate the diﬀerences between the generated data sets and the realistic data sets. The feedback of the second network to the generator network is used to improve the probability distribution encoded in the generator. Conversely, the second network is trained to distinguish between ever smaller remaining diﬀerences between the generated data sets and the realistic data sets. In this dual training process, the probability distribution of energy depositions is sampled from realistic data and transferred to the generator network."
+    },
+    {
+      "id": 18,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "In the original work on GANs for simulating particle showers in calorimeters, the evaluating network was a binary classiﬁer that returned as feedback a probability for each shower to be real. So far it turned out that here the generator training was only partially successful."
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "Instead of using binary classiﬁcation in the evaluating network, recently a high-dimensional distance measure between the probability distributions of example data and generated showers was successfully used for simulating an atmospheric calorimeter with a single readout layer [9]. In this simulation, the adversarial training was performed using the Wasserstein distance as it was applied in computer science research in the past [10, 11]. This variant of the GAN concept is referred to as WGAN (Wasserstein GAN)."
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "In this paper we apply the WGAN concept to the concrete setup of a test beam for a realistic electromagnetic sampling calorimeter, which consists of several pixelated readout layers interspersed with absorbers. Primary beam particles are electrons with diﬀerent energies E impinging perpendicularly at diﬀerent positions (Px, Py) on the front surface of the calorimeter. To generate dedicated particle showers for the initial conditions (Px, Py, E) of an electron, the architecture of the WGAN is supported by two additional networks constraining these beam conditions. The concept of using conditioning networks together with generative adversarial networks has been explored before [4, 6, 7, 9]."
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "1 Introduction",
+      "text": "The requirements for the generation of electromagnetic calorimeter showers are considerable."
+    },
+    {
+      "id": 22,
+      "page": 4,
+      "section": "1 Introduction",
+      "text": "Figure 1: Full wafer pixelation. Shaded pixels are of constant x and y coordinates, respectively."
+    },
+    {
+      "id": 23,
+      "page": 4,
+      "section": "1 Introduction",
+      "text": "b"
+    },
+    {
+      "id": 24,
+      "page": 4,
+      "section": "1 Introduction",
+      "text": "Figure 2: Energy depositions of an electromagnetic shower induced by a 20 GeV electron (top) and 90 GeV electron (bottom) with diﬀerent impact positions (X,Y) simulated using GEANT4. The 3D shower images consist of 12×15×7 pixels."
+    },
+    {
+      "id": 25,
+      "page": 4,
+      "section": "1 Introduction",
+      "text": "In each layer of the calorimeter, the transverse energy depositions must correspond to those of a particle shower. For the description of the longitudinal shower development, layer-wise correlations of reconstructed observables are also decisive. Therefore, a considerable proportion of our study is devoted to the quality assessment of the generated showers. This concerns aspects that are directly trained for, such as the initial beam conditions, as well as physical aspects which have to be learned during the adversarial training."
+    },
+    {
+      "id": 26,
+      "page": 4,
+      "section": "1 Introduction",
+      "text": "Our paper is structured as follows. We start by presenting the test beam experiment for the calorimeter and describe the data simulations used as sample data sets for training the WGAN. After that we explain the network structure of the WGAN together with the usage of the Wasserstein distance and the constrainer networks to respect the beam conditions. We then examine in detail the quality of the generated showers by comparing in particular the generated calorimeter showers with showers simulated using the GEANT4 program. Finally, we present our conclusions."
+    },
+    {
+      "id": 27,
+      "page": 4,
+      "section": "2.1 Calorimeter conﬁguration",
+      "text": "To discuss generative shower models in the context of a realistic detector, we choose from many possible calorimeter setups a conﬁguration of the electromagnetic compartment of a CMS High"
+    },
+    {
+      "id": 28,
+      "page": 5,
+      "section": "2.1 Calorimeter conﬁguration",
+      "text": "Granularity Calorimeter (HGCAL) prototype [15–17]. Various other HGCAL prototypes with diﬀerent sampling conﬁgurations have already been tested with beams at CERN and Fermilab since 2016 [18, 19]. This speciﬁc conﬁguration incorporates seven sensitive layers covering 2.8 - 16.2 radiation lengths (X0) of electromagnetic showers and was tested with highly energetic secondary electrons at CERN’s Super Proton Synchrotron test beam facility in September 2017. Each sensor is made of one 6-inch hexagonal silicon n-type wafer. Its active thickness at full depletion amounts to 300 µm. Most of the 135 individual pixels on each wafer are 1 cm2-sized hexagons. Pixels at the edges have various shapes. Only full and half pixels at the edges are considered in this study. Furthermore, centrally placed calibration pixels are treated as dead pixels here and hence are excluded from the shower measurement. Instead of using directly hexagonal geometries, a coordinate system is constructed such that the pixel positions are indicated in a 12×15 Cartesianlike frame following [9]. Shaded hexagons in Figure 1 illustrate the lines of constant x and y coordinates, respectively. After their assembly to full modules, the wafers are glued to 1.2 mm thick copper-tungsten baseplates and subsequently inserted into a hanging ﬁle system where they are interspersed by 6 mm thick copper- and 4.9 mm thick iron-coated lead absorbers. The test beam line is 15 m long and adds another 0.27 X0 of upstream material. It comprises six gas-ﬁlled delay wire chambers (DWC) [20] and six scintillation counters."
+    },
+    {
+      "id": 29,
+      "page": 5,
+      "section": "2.2 Reference dataset",
+      "text": "The training and the subsequent evaluation of the WGAN performance require a well-deﬁned reference dataset of electromagnetic showers. In general, this set is sampled from an underlying highly dimensional probability density which the WGAN is ultimately supposed to learn. Showers taken from this dataset are referred to as \"real\" in the following. In this paper, we construct sequences of real showers from simulation of electromagnetic cascades with GEANT4 version 10.2 [1, 2] using a speciﬁc tune of the FTFP_BERT physics list [21]. The geometry of the calorimeter and of the test beam line is implemented within a release of the oﬃcial CMS oﬄine computing software which is publicly available on GitHub [22]. Similar to real test beam data, energy depositions are converted into units of signal produced by minimum ionizing particles (MIPs) traversing a pixel. Furthermore, in order not to rely on idealized assumptions in the simulation, various constraints of typical beam tests of such a calorimeter are taken into account:"
+    },
+    {
+      "id": 30,
+      "page": 5,
+      "section": "2.2 Reference dataset",
+      "text": "• Electrons inducing showers traverse the upstream material in the beam line and impinge perpendicularly onto the calorimeter."
+    },
+    {
+      "id": 31,
+      "page": 5,
+      "section": "2.2 Reference dataset",
+      "text": "• Impact positions are extrapolated from straight line tracks computed from four position measurements as they would be measured by four DWCs in the beam line with 200 µm resolution each."
+    },
+    {
+      "id": 32,
+      "page": 5,
+      "section": "2.2 Reference dataset",
+      "text": "• The beam proﬁle is modeled with a rectangular geometry and covers an active area of 6×5 cm2. Its energies are smeared with a 1% uncertainty."
+    },
+    {
+      "id": 33,
+      "page": 5,
+      "section": "2.2 Reference dataset",
+      "text": "• Calorimeter pixels with energy depositions below 2 MIPs are removed from each shower to reject noise contributions."
+    },
+    {
+      "id": 34,
+      "page": 6,
+      "section": "2.2 Reference dataset",
+      "text": "The dataset for training the WGAN consists of 5 × 100, 000 electromagnetic showers induced by 20 GeV, 32 GeV, 50 GeV, 80 GeV and 90 GeV electrons. Due to the smearing of the energy and impact position measurements, the assigned labels deviate from the nominal values at the percentage level. By way of example, Figure 2 illustrates two real showers induced by one 20 GeV and one 90 GeV electron, respectively. For further evaluation, another dataset is constructed from simulated 70 GeV electrons. This sample serves exclusively to investigate the WGAN’s interpolation capacities to energy labels for which it has not been trained. The aforementioned beam energy smearing of 1% is not applied for this particular dataset."
+    },
+    {
+      "id": 35,
+      "page": 6,
+      "section": "3.1 Generative adversarial networks (GANs)",
+      "text": "Generative adversarial networks (GANs) are a widely used concept of generative models that was introduced by Goodfellow et al. in 2014 [4]. The framework consists of two adversarial networks, namely a generator network G and a discriminator network D. The overall goal of this adversarial framework is to train a generator to be able to generate samples ˜x = G(z) out of noise z, which are very similar to real samples x. During the training process the generator improves its performance using the feedback provided by the discriminator, which measures the similarity between generated and real samples."
+    },
+    {
+      "id": 36,
+      "page": 6,
+      "section": "3.1 Generative adversarial networks (GANs)",
+      "text": "Even though traditional GANs show impressive results, the training process is unstable and hard to monitor. Furthermore, GANs often suﬀer from mode collapsing when the generator is only able to generate data in a subspace of the real distribution. The recently published Wasserstein GAN [10] and its improvement [11] allows for a stabilized training procedure by delivering adequate gradients to the generator, providing a meaningful loss metric not being susceptible to mode collapsing. In the following section, we ﬁrst introduce the Wasserstein GAN and the method of label conditioning, and then present our network architecture and our training strategy. Finally, we describe the training of our adversarial framework to generate calorimeter showers."
+    },
+    {
+      "id": 37,
+      "page": 6,
+      "section": "3.2 Wasserstein GANs",
+      "text": "In Wasserstein GANs, the Wasserstein-1 metric is used as a similarity measure between the generated samples ˜x = G(z) and the real samples x. This distance is also known as Earth mover’s distance, because in a ﬁgurative sense it deﬁnes the cost for moving a distribution onto a target distribution using optimal transport. In the adversarial framework the Wasserstein loss is constructed using the Kantorovich-Rubinstein duality:"
+    },
+    {
+      "id": 38,
+      "page": 6,
+      "section": "3.2 Wasserstein GANs",
+      "text": "Here, \"supf ∈Lip1\" states that the supremum is over all the 1-Lipschitz functions f after application on the real samples x and generated samples ˜x. During the adversarial training, the 1-Lipschitz functions f which fulﬁll (3.1) are approximated by the discriminator network D. It is called critic because it is trained to allow for an estimate of the Wasserstein distance instead of being able to discriminate between real and generated samples. To allow for the approximation of the 1-Lipschitz functions using a neural network, the Lipschitz constraint is enforced by the gradient penalty [11] which extends the objective function to:"
+    },
+    {
+      "id": 39,
+      "page": 7,
+      "section": "3.2 Wasserstein GANs",
+      "text": "Here, λ is a hyperparameter for scaling the gradient penalty. The mixture term states that the Lipschitz constraint is enforced by sampling on straight lines between pairs of generated samples ˜x and real samples x. The random sampling is performed by sampling ε from a uniform distribution U(0, 1). To ensure accurate gradients for the generator, the critic is usually trained for several iterations before one generator update is applied. Thus, in Wasserstein GANs the generator attempts to minimize the Wasserstein distance (3.2) between the generated and the real samples, while the Wasserstein distance is approximated using the critic network by maximizing (3.2). This diﬀers to the traditional GAN setup where, under the assumption of an optimal discriminator, the generator attempts to minimize the Jensen-Shannon divergence."
+    },
+    {
+      "id": 40,
+      "page": 7,
+      "section": "3.3 Label conditioning",
+      "text": "For calorimeter simulations, generated samples must reﬂect certain label characteristics according to physics laws. The labels deﬁne the initial state of the simulation such as the incident particle’s kinematics and the degree of possible background activity (pileup) in the calorimeter. However, this label dependency is not ensured for samples generated by a generator which is trained using the WGAN approach. To be able to generate samples which can be associated with explicit labels, the concept of label conditioning introduced by Auxiliary Classiﬁer GANs (AC-GANs) [12] is a widely used concept for generative approaches in physics simulations [6, 7, 9]. To advance the WGAN concept to label conditioning we adapt the concept of [9]. In this speciﬁc conﬁguration, the initial state is determined by the electron energy and its impact position. Accordingly, the generator dependency is modiﬁed to G = G(z, E, P), and in our setup, besides noise z, the generator is given the physics labels of the electron energy E and the impact position coordinates P = (Px, Py) as input. Furthermore, we also provide the critic with the label information."
+    },
+    {
+      "id": 41,
+      "page": 7,
+      "section": "3.3 Label conditioning",
+      "text": "To constrain the generator and to evaluate how well the label characteristics are reﬂected in the generated samples, two constrainer networks ai are used. These constrainer networks are trained under supervision to reconstruct the impact position and the electron energy respectively using the real (labeled) samples. The mean squared error"
+    },
+    {
+      "id": 42,
+      "page": 7,
+      "section": "3.3 Label conditioning",
+      "text": "Lreal,i = [yi −ai(x)]2 (3.4) is used as an objective function for the constrainer networks. Here, yi is one label associated with the real sample x and ai(x) denotes the respective reconstruction by the constrainer network. The constrainer networks are trained under supervision during the critic training and are ﬁxed during the generator training. To enforce label conditioning of the generator, the generator loss is extended by n Õ κi|Lreal,i −Lfake,i|, (3.5) training step 0 50 100 150 200 training step 0 50 100 150 200 training step 0 50 100 150 200"
+    },
+    {
+      "id": 43,
+      "page": 8,
+      "section": "3.3 Label conditioning",
+      "text": "Figure 3: Loss curves of the constrainer networks during the supervised training for (a) the position regression and (b) the energy reconstruction. (c) Total critic loss closs during the training (black) and rescaled gradient penalty (yellow)."
+    },
+    {
+      "id": 44,
+      "page": 8,
+      "section": "3.3 Label conditioning",
+      "text": "where κi is a hyperparameter to scale the respective auxiliary loss. The loss"
+    },
+    {
+      "id": 45,
+      "page": 8,
+      "section": "3.3 Label conditioning",
+      "text": "Lfake,i = [αi −ai( ˜x)]2 = [αi −ai(G(z, E, P))]2, (3.6) states how well the input labels α1 = E, α2 = P for the generation can be reconstructed from the generated shower by the constrainer networks. In summary, the generator is trained to minimize the Wasserstein distance (3.2) and the auxiliary loss (3.5) provided by the constrainer networks. The absolute diﬀerence between both loss terms in (3.5) ensures that the label reconstruction of the generated and real samples remains on the same scale."
+    },
+    {
+      "id": 46,
+      "page": 8,
+      "section": "3.4 Strategy and network training",
+      "text": "Our framework for the generation of electromagnetic calorimeter showers consists of four networks: one generator, one critic and two constrainer networks. One of the constrainer networks is used for conditioning the energy E, while the second is used for conditioning the impact position P. The networks, their training and their evaluation are implemented using the Tensorﬂow [13] framework (v1.5). Exact details of all architectures can be found in the appendix A in table 2, 3 and 4."
+    },
+    {
+      "id": 47,
+      "page": 8,
+      "section": "3.4 Strategy and network training",
+      "text": "The generator consists of two parts: The ﬁrst part is separated into 7 towers, each of which has the same structure, and a joint part which merges the towers. Each of the 7 towers is given 10 latent variables z and 3 labels α describing the energy and the impact position of the calorimeter shower as input. After two fully connected layers and a reshape, a block of three 2D transposed"
+    },
+    {
+      "id": 48,
+      "page": 9,
+      "section": "3.4 Strategy and network training",
+      "text": "Figure 4: Energy depositions generated with the WGAN for a ﬁxed impact position of an electromagnetic shower for a 20 GeV electron (top) and for a 90 GeV electron (bottom)."
+    },
+    {
+      "id": 49,
+      "page": 9,
+      "section": "3.4 Strategy and network training",
+      "text": "Figure 5: Cell occupancy for 90 GeV electrons simulated using GEANT4 (top) and generated by the WGAN (bottom). Dead pixels and areas outside the sensor acceptance are masked in the generator."
+    },
+    {
+      "id": 50,
+      "page": 9,
+      "section": "3.4 Strategy and network training",
+      "text": "convolutions and a single 2D convolution follows. Next, the 7 towers are concatenated to a joint part with three 2D convolutional layers. Finally a locally connected convolutional layer completes the generator architecture. Between the convolutional and transposed convolutional layers we use batch normalization and leaky ReLUs as activations. After the last layer we do not apply batch normalization and use ReLU as activation to allow for the generation of sparse calorimeter images. To enlarge the prior for the generation process, a masking layer masks the dead pixels and regions outside the calorimeter by setting the respective values to zero."
+    },
+    {
+      "id": 51,
+      "page": 9,
+      "section": "3.4 Strategy and network training",
+      "text": "The critic network is given as additional input the 3 labels, which are processed by two fully connected layers and a reshape to obtain a two-dimensional shape. The following architecture of the critic is straightforward and consists of ﬁve 2D convolutional layers followed by a fully connected layer and the output layer. As activation we use leaky ReLU to avert sparse gradients. Between the layers we use layer normalization instead of batch normalization as we use the gradient penalty loss."
+    },
+    {
+      "id": 52,
+      "page": 9,
+      "section": "3.4 Strategy and network training",
+      "text": "For both constrainer networks we used a very similar architecture of 3D convolutions where we varied only the classiﬁcation layer. For better convergence and regularizing eﬀects we use batch normalization between the layers. Furthermore, we use leaky ReLU as nonlinearity to ensure suﬃcient gradients."
+    },
+    {
+      "id": 53,
+      "page": 9,
+      "section": "3.4 Strategy and network training",
+      "text": "During training the losses of the constrainer networks are scaled with κE = κP = 0.01. The gradient penalty scale is set to λ = 5. We update the constrainer networks and the critic for ncr = 9 iterations before updating the generator once. We use a batch size of 256 and train the framework for 150 epochs on a single NVIDIA GeForce GTX 1080 which takes about 30 hours."
+    },
+    {
+      "id": 54,
+      "page": 10,
+      "section": "3.4 Strategy and network training",
+      "text": "[GeV] DNN E 20 40 60 80"
+    },
+    {
+      "id": 55,
+      "page": 10,
+      "section": "3.4 Strategy and network training",
+      "text": "[mm] x Label P 20 0 20"
+    },
+    {
+      "id": 56,
+      "page": 10,
+      "section": "3.4 Strategy and network training",
+      "text": "[mm] y Label P 20 10 0 10 20"
+    },
+    {
+      "id": 57,
+      "page": 10,
+      "section": "3.4 Strategy and network training",
+      "text": "Figure 6: Distribution of energies reconstructed by the constrainer network computed on generated and GEANT4 simulated showers for diﬀerent energy labels (a). Impact position Px (b), and impact position Py (c) of generated showers reconstructed by the constrainer network as a function of their true labels. Statistical errors on these means are negligible. Note that 70 GeV showers were not part of the training set."
+    },
+    {
+      "id": 58,
+      "page": 10,
+      "section": "3.4 Strategy and network training",
+      "text": "We use 10 latent variables each following a uniform distribution U(−1, 1). Furthermore, we use the Adam optimizers with β1 = 0.0, β2 = 0.9 [11] and diﬀerent learning rates for the networks. The constrainer networks use a small learning rate of lr = 5 · 10−5. Their training is stopped after 50 epochs. For the generator we use a learning rate of lr = 10−3 and drop the learning rate after 70, 90 and 100 epochs to lr = 5 · 10−4, lr = 2 · 10−4 or rather lr = 10−4. For the critic we use an initial learning rate of lr = 5 · 10−4 and change the learning rate to lr = 2 · 10−4, lr = 10−4 and lr = 5 · 10−5 after 60, 80 and 100 epochs, respectively."
+    },
+    {
+      "id": 59,
+      "page": 10,
+      "section": "4 Performance benchmarks",
+      "text": "Various benchmarks related to the quality of our generated electromagnetic showers are discussed in the following. It will be demonstrated that WGAN produces high-quality showers which resemble the real dataset in many aspects while lowering the computing time to simulate a full electromagnetic shower by three orders of magnitude."
+    },
+    {
+      "id": 60,
+      "page": 10,
+      "section": "4 Performance benchmarks",
+      "text": "The investigation is structured as follows. In section 4.1 we perform a visual inspection of WGAN generated showers. First, we illustrate two examples on which qualitative observations are highlighted. Second, the analysis of pixel occupations reveals that the trained WGAN considers the radially decreasing occupancy proﬁle. In section 4.2 we then show that the generated samples reﬂect characteristics related to the input physics labels. This behavior was enforced indirectly through the extended generator loss (3.5). By contrast, any other physically motivated observable evaluated on the generated showers was not constrained in the training. However, as illustrated in section 4.3, many distributions of shower characterizing quantities computed on the generated showers match those computed from the real dataset well. Moreover, we demonstrate that key correlations between calorimeter observables are obtained. For all reported benchmark scenarios, good shower qualities for 70 GeV electron showers are obtained despite the fact that these were not part of the training set."
+    },
+    {
+      "id": 61,
+      "page": 10,
+      "section": "4 Performance benchmarks",
+      "text": "Finally, this section is concluded with a report on the WGAN’s computational time advantage over detailed simulation using GEANT4."
+    },
+    {
+      "id": 62,
+      "page": 11,
+      "section": "4.1 Visual inspection of generated showers",
+      "text": "Figure 4 shows two exemplary electron-induced showers with 20 GeV and 90 GeV energy labels generated using the WGAN approach."
+    },
+    {
+      "id": 63,
+      "page": 11,
+      "section": "4.1 Visual inspection of generated showers",
+      "text": "This set of energy depositions is consistent with the physical intuition of how electron-induced cascades in this sampling calorimeter conﬁguration should develop. First, it is noted that both pixel occupancies and pixel intensities scale with the incident electron energy. Second, the positions of the largest energy depositions move according to the input impact position labels. Finally, it is evident that the main activity of generated showers occurs in the central sampling compartments. In particular, the spread and the scale of energy depositions is maximal in intermediate layers, while only a few pixels are active in the ﬁrst and last layers."
+    },
+    {
+      "id": 64,
+      "page": 11,
+      "section": "4.1 Visual inspection of generated showers",
+      "text": "Figure 5 shows the average pixel occupancy with energy depositions above the 2 MIP threshold of 90 GeV electron-induced showers simulated using GEANT4 compared to those generated by the WGAN. White spaces correspond to areas of the sensors which are activated above the threshold in less than 1% of the events. The radial development of the pixel occupancy of WGAN-generated showers is similar to GEANT4 while the overall scale appears underestimated."
+    },
+    {
+      "id": 65,
+      "page": 11,
+      "section": "4.2 Label dependency",
+      "text": "Three physics labels, namely the incident’s electron energy E and its impact position P = (Px, Py), are input to the WGAN. Ideally, these labels should constrain the shower generation process. As described in section 3.3, two constrainer networks are trained with real samples for this purpose and then reconstruct these labels based on the full shower information. For the training to be rated as successful, the reconstructed labels of the generated showers should correlate with the imposed physics labels. Figure 6a shows the distribution of reconstructed energies for diﬀerent energy labels. Their maxima correlate to the true labels. Furthermore, the energy spectra computed on WGAN generated and GEANT4 simulated showers exhibit a reasonable agreement. Figures 6b and 6c show the correlation for position labels. Here, the symbols indicate the mean reconstructed label in bins of the true label. On average, a generated shower with a certain set of labels is reconstructed accordingly. Evidently, shower characteristics which the two constrainer networks are sensitive to are able to condition the generation process. Even the 70 GeV electron cascades, which were not considered in the training, exhibit the same behavior."
+    },
+    {
+      "id": 66,
+      "page": 11,
+      "section": "4.3 Calorimeter observables",
+      "text": "In this section, typical calorimeter observables are presented which are computed both in GEANT4 simulations and WGAN-generated showers. For better clarity, only the 32 GeV and 90 GeV as well as the additional 70 GeV electron samples are shown. The agreement between real and generated cascades illustrated therein are representative for the entire dataset. Note that 70 GeV showers were not part of the training set."
+    },
+    {
+      "id": 67,
+      "page": 11,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "Figure 7 shows six sets of representative observables that characterize particle showers in sampling calorimeter conﬁgurations. The distributions are normalized to unity."
+    },
+    {
+      "id": 68,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "[MIPs] sum, all E 1000 2000 3000"
+    },
+    {
+      "id": 69,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "0.12 - Geant4, 32 GeV e"
+    },
+    {
+      "id": 70,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "Shower depth [layer] 2.5 3 3.5 4 4.5 5"
+    },
+    {
+      "id": 71,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": ", layer 2 [MIPs] max E 100 200 300 400 500"
+    },
+    {
+      "id": 72,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "0.08 - Geant4, 90 GeV e"
+    },
+    {
+      "id": 73,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": ", layer 4 [MIPs] max E 100 200 300 400 500"
+    },
+    {
+      "id": 74,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "[indexes] layer 2 Y 0.4 0.6 0.8 1 1.2 1.4"
+    },
+    {
+      "id": 75,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "[indexes] layer 4 Y 0.4 0.6 0.8 1 1.2 1.4"
+    },
+    {
+      "id": 76,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "Figure 7: Comparison of calorimeter observables computed in generated showers (symbols) to those computed in fully simulated showers using GEANT4 (histograms). (a) Energy sum of all pixels, (b) energy-weighted shower depth, (c, d) the maximum pixel energy in layer 2, respectively 4, and (e, f) the transverse shower spread along the y-direction in layer 2, respectively 4. The 70 GeV showers were not part of the training set."
+    },
+    {
+      "id": 77,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "A reasonable agreement between WGAN- and GEANT4-simulated showers is seen in Figure 7a for the total energy deposition summed over all pixels and in Figure 7b for the longitudinal shower depth. Also, the maximum pixel energy for each individual layer exhibits a good match with the full simulation (only layers 2 and 4 are shown in Figures 7c, 7d). Furthermore, we compute the energy-weighted transverse spread in each layer."
+    },
+    {
+      "id": 78,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "∆Ylayer 2 and ∆Ylayer 4 are shown here (7e, 7f) by way of example. The computation for other layers l and for the x coordinate is analogous. With the exception of the ﬁrst layer at 2.8 X0, the agreement therein is representative for all other layers and the x-coordinate. Thus the transverse shower shapes are well-modeled by the WGAN."
+    },
+    {
+      "id": 79,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "In Figure 8b we investigate the energy spectrum of active pixels. The region of low energy densities, i.e. pixels with depositions below ≈10 MIPs, is underrepresented by the WGAN with respect to GEANT4 causing a mismatch in the number of active pixels (energy ≥2 MIPs) in Figure 8a and ultimately also resulting in the underestimate of their energy sum (Figure 7a). Similar mismodeling of sparsity-describing quantities has also been reported in the work based on traditional GANs [6, 8]. It should be noted that the analysis of such fast simulated showers could always be limited to the well-described range by restricting the analysis to pixels with energies above 10 MIP equivalents. In this calorimeter setup, the rejected part of the spectrum contributes only 10% to the total signal. This could be corrected by scale factors."
+    },
+    {
+      "id": 80,
+      "page": 12,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "Following this principle, we conducted a supplementary performance benchmark. Example graphics are shown in the appendix (Figures 10, 11). The agreement between the WGAN and"
+    },
+    {
+      "id": 81,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "(Energy) of active pixel [MIPs] 10 log 0.5 1 1.5 2 2.5"
+    },
+    {
+      "id": 82,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "Figure 8: (a) Distributions of the number of pixels with energy depositions above 2 MIPs equivalents for several energies. (b) Single pixel energy spectra show reasonable agreement with the simulation for energy densities above ≈10 MIPs per pixel. Note that 70 GeV showers were not part of the training set."
+    },
+    {
+      "id": 83,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": ", layer 3 [MIPs] sum E 200 400 600 800 1000"
+    },
+    {
+      "id": 84,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": ", layer 4 [MIPs] max E 100 200 300 400 500"
+    },
+    {
+      "id": 85,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": ", layer 3 [MIPs] max E 200 400 600"
+    },
+    {
+      "id": 86,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": ", layer 4 [MIPs] sum E 200 400 600 800"
+    },
+    {
+      "id": 87,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "[MIPs] sum, all E 1000 2000 3000"
+    },
+    {
+      "id": 88,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "Figure 9: Comparison of calorimeter observable correlations evaluated on generated and GEANT4- simulated showers. (a) Energy sum, respectively (b) maximum pixel energy, in layer 4 vs. total energy deposit (maximum pixel energy) in layer 3. (c) Energy sum, respectively (d) maximum pixel energy, in layer 5 vs. total energy deposit (maximum pixel energy) in layer 4. (e) Total energy deposit plotted against number of hits. (f) Shower depth vs. total energy deposit. Note that 70 GeV showers were not part of the training set."
+    },
+    {
+      "id": 89,
+      "page": 13,
+      "section": "4.3.1 Distributions of calorimeter observables",
+      "text": "GEANT4 in this regime is improved also for all other observables."
+    },
+    {
+      "id": 90,
+      "page": 13,
+      "section": "4.3.2 Correlations",
+      "text": "For energy reconstruction or particle identiﬁcation in modern particle detection systems, multiple calorimeter observables are needed simultaneously (e.g. [23]). Typical approaches exploit correlations of shower characteristics. Consequently, a crucial quality measure for a simulation tool is the assessment of the pairwise correlations of reconstructed physics observables."
+    },
+    {
+      "id": 91,
+      "page": 13,
+      "section": "4.3.2 Correlations",
+      "text": "In this section, we focus on four examples of such correlations. First, both the summed energy"
+    },
+    {
+      "id": 92,
+      "page": 14,
+      "section": "4.3.2 Correlations",
+      "text": "Table 1: Computational time required for the generation of one 20 GeV, respectively 90 GeV, electron-induced cascade through evaluation of the WGAN using diﬀerent hardware setups and enhancement with respect to a full simulation using GEANT4. Using the WGAN approach, a speed-up of more than three orders of magnitude has been achieved."
+    },
+    {
+      "id": 93,
+      "page": 14,
+      "section": "4.3.2 Correlations",
+      "text": "Method Hardware 20 GeV e− Speed-up 90 GeV e− Speed-up"
+    },
+    {
+      "id": 94,
+      "page": 14,
+      "section": "4.3.2 Correlations",
+      "text": "GEANT4 any CPU O (500 ms) - O (2000 ms) - WGAN Intel© Xeon© CPU E5-1620 52 ms x10 52 ms x40 WGAN NVIDIA© Quadro© K2000 GPU 3.6 ms x140 3.6 ms x560 WGAN NVIDIA© GTX™1080 GPU 0.3 ms x1660 0.3 ms x6660 and the maximum pixel energy in a ﬁxed layer is expected to correlate with the sum (maximum) in the previous layer. Fig. 9a - 9d visualize this trend for layers 3 and 4, respectively 4 and 5, by way of example. It must be noted that the WGAN-generated showers exhibit good agreement with the GEANT4 showers."
+    },
+    {
+      "id": 95,
+      "page": 14,
+      "section": "4.3.2 Correlations",
+      "text": "Second, a greater number of active pixels should correspond to higher values in the sum of energy depositions, which is illustrated in Figure 9e. Some discrepancy is to be expected owing to the underestimation of the low energy spectrum by the WGAN. While the positive correlation is also obtained for the WGAN samples, an agreement is not reached."
+    },
+    {
+      "id": 96,
+      "page": 14,
+      "section": "4.3.2 Correlations",
+      "text": "Ultimately, the sampling in this speciﬁc calorimeter conﬁguration is not uniform as the setup comprises non-equidistant sampling layers. As a consequence, showers with large energy depositions at a ﬁxed incident electron energy should relate to lower shower depths. Showers whose center of gravity is located deeper in the calorimeter deposit higher fractions of their energy in the larger amount of passive material between layer 5 and 7, hence resulting in lower values of energy sums in the sensitive layers. Also for this example, a good match between real and WGAN-generated showers is displayed in Figure 9f."
+    },
+    {
+      "id": 97,
+      "page": 14,
+      "section": "4.3.2 Correlations",
+      "text": "In summary, typical calorimeter observables computed in fast WGAN-generated showers correspond well to those simulated using GEANT4, not only in terms of their spectra but also in their pairwise correlations. Only the number of low-energy depositions is too small. A detailed simulation typically requires extensive tuning of its model parameters using expert knowledge in particle interactions with matter to achieve a similar level of agreement to real data. By contrast, no dedicated knowledge on how particles interact with the material had to be input into the generative model here."
+    },
+    {
+      "id": 98,
+      "page": 14,
+      "section": "4.4 Computational speed-up",
+      "text": "We observe that fast simulation of electromagnetic showers using this WGAN architecture is up to three orders of magnitude faster than full simulations. By contrast, expert engineered, parameterized fast simulation provides CPU gains of 10-100 with respect to GEANT4 depending on the particle energy, see e.g. [24]. In Table 1, we provide numbers on the computation time advantage of our WGAN compared to GEANT4 using three diﬀerent hardware architectures. As expected, graphics processing units (GPUs) are the preferred hardware unit since the WGAN’s internal set of linear computational operations is more eﬃciently parallelized and runs faster than in CPUs."
+    },
+    {
+      "id": 99,
+      "page": 15,
+      "section": "4.4 Computational speed-up",
+      "text": "Furthermore, it is remarkable that the time for evaluation of the WGAN is independent of the incident electron energy while it scales signiﬁcantly in simulations using GEANT4."
+    },
+    {
+      "id": 100,
+      "page": 15,
+      "section": "5 Conclusion",
+      "text": "In this paper, we presented a method for generating electromagnetic showers using a Wasserstein GAN (WGAN). As a concrete example, we followed a prototype setup for a future high-granularity calorimeter with seven sensitive layers featuring about one thousand readout pixels placed in an electron beam. As a generative model, we constructed a system of two adversarial networks, one being the generator and the other ensuring high-quality showers. The latter is called the critic network and was active only during the training phase where the probability distribution encoded in reference data was transferred to the generator. The critic network is designed to provide an approximation of the Wasserstein distance between generated and reference data. Using this concept, the training process was found to be well under control. Furthermore, two constrainer networks were included within the elaborate multi-network architecture. These constrainer networks ensure the desired dependencies of the generated showers with respect to the primary electron energies and impact locations on the calorimeter. They were also trained successfully within the elaborate multi-network architecture."
+    },
+    {
+      "id": 101,
+      "page": 15,
+      "section": "5 Conclusion",
+      "text": "When benchmarking the WGAN-generated showers, visual inspections of single showers reveal the typical shower properties with high ﬂuctuations and sparse energy depositions. The average pixel occupancy in the sensitive layers of WGAN-generated showers and of GEANT4 showers appears to be very similar."
+    },
+    {
+      "id": 102,
+      "page": 15,
+      "section": "5 Conclusion",
+      "text": "Various observables typically inspected for calorimeter showers exhibit good agreement with WGAN-generated and GEANT4 showers. For example, the shapes of the longitudinal shower depths are well reproduced not only for the diﬀerent primary electron energies which the network had been trained for but also for an intermediate electron energy which the network had not encountered before. Also, the total energy depositions in each sensitive layer and the maximum energy in a sensor are described in detail. Furthermore, the transverse shower shapes appear as expected. Only the spectrum at low-energy densities is underestimated by the WGAN. Hence, the total number of sensor pixels with energies above a threshold energy equivalent to two minimum ionizing particles (MIPs) was found to be reduced by about 15%."
+    },
+    {
+      "id": 103,
+      "page": 15,
+      "section": "5 Conclusion",
+      "text": "In addition, we analyzed correlations between energy depositions in the sensitive layers. Also here we established a strong agreement between the energies of neighboring layers for the diﬀerent primary electron energies. The longitudinal shower depth decreases with increasing energy sums of all layers as expected for this speciﬁc sampling conﬁguration. We also correlate the total energy sum with the total number of sensor pixels with energies above the 2 MIPs threshold."
+    },
+    {
+      "id": 104,
+      "page": 15,
+      "section": "5 Conclusion",
+      "text": "While this setup has only been studied in the context of isolated showers, there are ideas for its application to full collision events. In particular, it is straight forward to extend the set of labels limiting the WGAN simulation to a quantitative measure of background activity around a given shower. Alternatively, energy deposits of independent but simultaneously occurring particles in a sensor could be superimposed if electronic and saturation eﬀects can be neglected in the underlying detection technology."
+    },
+    {
+      "id": 105,
+      "page": 16,
+      "section": "5 Conclusion",
+      "text": "In the work presented here it was shown that a WGAN can be successfully used to simulate isolated electromagnetic showers in a realistic setup of a multi-layer sampling calorimeter. The computational speed-up compared to traditional sequential simulations amounts to several orders of magnitude. At the same time, in most aspects, the quality of these ultra-fast shower simulations with the WGAN reaches the level of showers generated with the GEANT4 program."
+    },
+    {
+      "id": 106,
+      "page": 17,
+      "section": "Acknowledgments",
+      "text": "For valuable discussions and comments on the manuscript we wish to thank Lucie Linssen, Eva Sicking and Florian Pitters from the EP-LCD group at CERN, and Yannik Rath from the Aachen group. We gratefully acknowledge permission to apply the geometry ﬁles provided by the CMS HGCAL group for simulating data needed for this study. This work is supported by the Ministry of Innovation, Science and Research of the State of North Rhine-Westphalia, and the Federal Ministry of Education and Research (BMBF). Thorben Quast gratefully acknowledges the grant of the Wolfgang Gentner scholarship."
+    },
+    {
+      "id": 107,
+      "page": 17,
+      "section": "References",
+      "text": "[1] S. Agostinelli et al. [GEANT4 Collaboration], “GEANT4: A Simulation toolkit,” Nucl. Instrum."
+    },
+    {
+      "id": 108,
+      "page": 17,
+      "section": "References",
+      "text": "Meth. A 506 (2003) 250. doi:10.1016/S0168-9002(03)01368-8"
+    },
+    {
+      "id": 109,
+      "page": 17,
+      "section": "References",
+      "text": "[2] J. Allison et al., “Geant4 developments and applications,” IEEE Trans. Nucl. Sci. 53 (2006) 270."
+    },
+    {
+      "id": 110,
+      "page": 17,
+      "section": "References",
+      "text": "doi:10.1109/TNS.2006.869826"
+    },
+    {
+      "id": 111,
+      "page": 17,
+      "section": "References",
+      "text": "[3] J. Allison et al., “Recent developments in Geant4,” Nucl. Instrum. Meth. A 835 (2016) 186."
+    },
+    {
+      "id": 112,
+      "page": 17,
+      "section": "References",
+      "text": "doi:10.1016/j.nima.2016.06.125"
+    },
+    {
+      "id": 113,
+      "page": 17,
+      "section": "References",
+      "text": "[4] I. Goodfellow et al: Generative Adversarial Networks. arXiv:1406.2661 [stat.ML] (2014)"
+    },
+    {
+      "id": 114,
+      "page": 17,
+      "section": "References",
+      "text": "[5] A. Shrivastava et al: Learning from Simulated and Unsupervised Images through Adversarial"
+    },
+    {
+      "id": 115,
+      "page": 17,
+      "section": "References",
+      "text": "Training. arXiv:1612.07828 [cs.CV] (2016)"
+    },
+    {
+      "id": 116,
+      "page": 17,
+      "section": "References",
+      "text": "[6] B. Hooberman, et al.: Calorimetry with Deep Learning: Particle Classiﬁcation, Energy Regression, and Simulation for High-Energy Physics. Proc. Deep Learning for Physical Sciences Workshop at the 31st Conf. Neural Information Processing Systems (NIPS), 2017, Long Beach, United States"
+    },
+    {
+      "id": 117,
+      "page": 17,
+      "section": "References",
+      "text": "[7] M. Paganini, L. de Oliveira, B. Nachman: Accelerating Science with Generative Adversarial"
+    },
+    {
+      "id": 118,
+      "page": 17,
+      "section": "References",
+      "text": "Networks: An Application to 3D Particle Showers in Multilayer Calorimeters. Phys. Rev. Lett. 120(4), 042003 (2018)"
+    },
+    {
+      "id": 119,
+      "page": 17,
+      "section": "References",
+      "text": "[8] M. Paganini, L. de Oliveira, B. Nachman: CaloGAN. Phys. Rev. D 97, 014021 (2018)"
+    },
+    {
+      "id": 120,
+      "page": 17,
+      "section": "References",
+      "text": "[9] M. Erdmann, L. Geiger, J. Glombitza, D. Schmidt: Generating and Reﬁning Particle Detector"
+    },
+    {
+      "id": 121,
+      "page": 17,
+      "section": "References",
+      "text": "Simulations Using the Wasserstein Distance in Adversarial Networks, Comput Softw Big Sci (2018) 2: 4. https://doi.org/10.1007/s41781-018-0008-x"
+    },
+    {
+      "id": 122,
+      "page": 17,
+      "section": "References",
+      "text": "[10] M. Arjovsky, S. Chintala, L. Bottou: Wasserstein GAN. arXiv:1701.07875 [stat.ML] (2017)"
+    },
+    {
+      "id": 123,
+      "page": 17,
+      "section": "References",
+      "text": "[11] I. Gulrajani, et al: Improved Training of Wasserstein GANs. arXiv:1704.00028 [cs.LG] (2017)"
+    },
+    {
+      "id": 124,
+      "page": 17,
+      "section": "References",
+      "text": "[12] A. Odena, C. Olah, J. Shlens: Conditional Image Synthesis With Auxiliary Classiﬁer GANs."
+    },
+    {
+      "id": 125,
+      "page": 17,
+      "section": "References",
+      "text": "arXiv:1610.09585 [stat.ML] (2016)"
+    },
+    {
+      "id": 126,
+      "page": 17,
+      "section": "References",
+      "text": "[13] M. Abadi et al: TensorFlow: Large-scale machine learning on heterogeneous systems, arxiv:1603.04467 [cs.DC], https://www.tensorﬂow.org."
+    },
+    {
+      "id": 127,
+      "page": 17,
+      "section": "References",
+      "text": "[14] G. Apollinari, et al., High-Luminosity Large Hadron Collider, Technical Design Report"
+    },
+    {
+      "id": 128,
+      "page": 17,
+      "section": "References",
+      "text": "CERN-2015-005. (December 2015)"
+    },
+    {
+      "id": 129,
+      "page": 17,
+      "section": "References",
+      "text": "[15] The CMS Collaboration, The CMS Experiment at the CERN LHC, JINST 3 S08004 (August 2008)"
+    },
+    {
+      "id": 130,
+      "page": 17,
+      "section": "References",
+      "text": "[16] D. Contardo, et al., The Phase-2 Upgrade of the CMS Endcap Calorimeter, Technical Design Report"
+    },
+    {
+      "id": 131,
+      "page": 17,
+      "section": "References",
+      "text": "CERN-LHCC-2017-023. CMS-TDR-019. ISBN 978-92-9083-459-5. (April 2018)"
+    },
+    {
+      "id": 132,
+      "page": 18,
+      "section": "References",
+      "text": "[17] A. Martelli., The CMS HGCal detector for HL-LHC Upgrade, arXiv:1708.08234v1 [physics.ins-det]"
+    },
+    {
+      "id": 133,
+      "page": 18,
+      "section": "References",
+      "text": "(February 2018)"
+    },
+    {
+      "id": 134,
+      "page": 18,
+      "section": "References",
+      "text": "[18] S. Jain, Construction and ﬁrst beam-tests of silicon- tungsten prototype modules for the CMS High"
+    },
+    {
+      "id": 135,
+      "page": 18,
+      "section": "References",
+      "text": "Granularity Calorimeter for HL-LHC, JINST 12 C03011 (March 2017)"
+    },
+    {
+      "id": 136,
+      "page": 18,
+      "section": "References",
+      "text": "[19] T. Quast, Construction and beam-tests of silicon-tungsten prototype modules for the CMS High"
+    },
+    {
+      "id": 137,
+      "page": 18,
+      "section": "References",
+      "text": "Granularity Calorimeter for HL-LHC, JINST 13 C02044 (Februrary 2018)"
+    },
+    {
+      "id": 138,
+      "page": 18,
+      "section": "References",
+      "text": "[20] J. Spanggaard, Delay Wire Chambers - A Users Guide, SL-Note-98-023. (1998)"
+    },
+    {
+      "id": 139,
+      "page": 18,
+      "section": "References",
+      "text": "[21] T. Banerjee, Validation of Physics Models of GEANT4 using Data from CMS Experiment, J. Phys.:"
+    },
+    {
+      "id": 140,
+      "page": 18,
+      "section": "References",
+      "text": "Conf. Ser. 898 042005. (2017)"
+    },
+    {
+      "id": 141,
+      "page": 18,
+      "section": "References",
+      "text": "[22] https://github.com/cms-sw/cmssw/tree/CMSSW_10_0_X"
+    },
+    {
+      "id": 142,
+      "page": 18,
+      "section": "References",
+      "text": "[23] J. Colas et al [ATLAS Collaboration]: Position resolution and particle identiﬁcation with the ATLAS"
+    },
+    {
+      "id": 143,
+      "page": 18,
+      "section": "References",
+      "text": "EM calorimeter. Nuclear Instruments and Methods in Physics Research Section A 550, Pages 96-115 (2005)"
+    },
+    {
+      "id": 144,
+      "page": 18,
+      "section": "References",
+      "text": "[24] Soon Yung Jun, Gﬂash as a Parameterized Calorimeter Simulation for the CMS Experiment, J. Phys.:"
+    },
+    {
+      "id": 145,
+      "page": 18,
+      "section": "References",
+      "text": "Conf. Ser. 293 012023. (2011)"
+    },
+    {
+      "id": 146,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Table 2: Critic network as used in the adversarial framework."
+    },
+    {
+      "id": 147,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Operation Kernel Features Padding Normalization Activation"
+    },
+    {
+      "id": 148,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Critic input 12 × 15 × 7 + 3"
+    },
+    {
+      "id": 149,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Linear N/A 10 nodes N/A × leaky ReLU Linear N/A 180 nodes N/A × leaky ReLU Reshape to 12 × 15 × 1"
+    },
+    {
+      "id": 150,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Concatenation with input to 12 × 15 × 8"
+    },
+    {
+      "id": 151,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Convolution 2D 5×5 256 maps same × leaky ReLU Convolution 2D 3×3 128 maps same layer norm leaky ReLU Convolution 2D 3×3 64 maps same layer norm leaky ReLU Convolution 2D 3×3 32 maps same layer norm leaky ReLU Convolution 2D 3×3 16 maps same layer norm leaky ReLU Linear N/A 10 nodes N/A × leaky ReLU Linear N/A 1 node N/A × ×"
+    },
+    {
+      "id": 152,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Critic output 1"
+    },
+    {
+      "id": 153,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Table 3: Generator network as used in the framework to generate electromagnetic calorimeter showers."
+    },
+    {
+      "id": 154,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Operation Kernel Features stride Padding Normalization Activation"
+    },
+    {
+      "id": 155,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Generator input 10 + 3"
+    },
+    {
+      "id": 156,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Tower ×7 Linear N/A 10 nodes N/A N/A × leaky ReLU Linear N/A 192 nodes N/A N/A × leaky ReLU Reshape to 3 × 4 × 16 Transposed convolution 2D 3×3 16 maps 2×2 same batch norm leaky ReLU Transposed convolution 2D 3×3 32 maps 2×2 same batch norm leaky ReLU Transposed convolution 2D 3×3 64 maps 2×2 same batch norm leaky ReLU Convolution 2D 5×9 1 maps 1×1 same batch norm leaky ReLU"
+    },
+    {
+      "id": 157,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Concatenation of 7 towers Convolution 2D 3×3 64 maps 1×1 same batch norm leaky ReLU Convolution 2D 5×6 128 maps 1×1 valid batch norm leaky ReLU Convolution 2D 3×3 14 maps 1×1 same batch norm leaky ReLU Locally connected 2D 3×3 7 maps 1×1 same × ReLU"
+    },
+    {
+      "id": 158,
+      "page": 19,
+      "section": "A Appendix",
+      "text": "Generator output 12 × 15 × 7"
+    },
+    {
+      "id": 159,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Table 4: Constrainer network as used in the framework for energy (position) regression."
+    },
+    {
+      "id": 160,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Operation Kernel Features Padding Normalization Activation"
+    },
+    {
+      "id": 161,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Constrainer input 12 × 15 × 7 × 1"
+    },
+    {
+      "id": 162,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Convolution 3D 3×3×3 1 map same batch norm leaky ReLU Convolution 3D 3×3×2 16 maps same batch norm leaky ReLU Convolution 3D 3×3×2 16 maps same batch norm leaky ReLU Convolution 3D 3×3×2 32 maps same batch norm leaky ReLU Convolution 3D 3×3×2 32 maps same batch norm leaky ReLU Convolution 3D 3×5×2 64 maps same × leaky ReLU Linear N/A 1(2) node(s) N/A × ×"
+    },
+    {
+      "id": 163,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Constrainer output 1(2)"
+    },
+    {
+      "id": 164,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Figure 10: Analogous to Figure 5. The noise threshold is set to 10 MIPs instead of 2 MIPs."
+    },
+    {
+      "id": 165,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "[MIPs] sum, all E 1000 2000 3000 hits N 10 20 30 40 50 60"
+    },
+    {
+      "id": 166,
+      "page": 20,
+      "section": "A Appendix",
+      "text": ", layer 4 [MIPs] sum E 200 400 600 800"
+    },
+    {
+      "id": 167,
+      "page": 20,
+      "section": "A Appendix",
+      "text": ", layer 3 [MIPs] sum E 200 400 600 800 1000 hits N 10 20 30 40 50 60"
+    },
+    {
+      "id": 168,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "[MIPs] sum, all E 1000 2000 3000"
+    },
+    {
+      "id": 169,
+      "page": 20,
+      "section": "A Appendix",
+      "text": "Figure 11: Analogous to Figures 7, 8 and 9. The noise threshold is set to 10 MIPs instead of 2 MIPs."
+    }
+  ],
+  "skipped_pages": []
+}

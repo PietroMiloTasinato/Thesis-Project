@@ -1,0 +1,1520 @@
+{
+  "source": "p2305.11934v2.pdf",
+  "title": null,
+  "num_pages": 19,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "Inductive Simulation of Calorimeter Showers with Normalizing Flows",
+      "text": "Matthew R. Buckley, Ian Pang, and David Shih NHETC, Dept. of Physics and Astronomy, Rutgers University, Piscataway, NJ 08854, USA"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Inductive Simulation of Calorimeter Showers with Normalizing Flows",
+      "text": "Claudius Krause NHETC, Dept. of Physics and Astronomy, Rutgers University, Piscataway, NJ 08854, USA and"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Inductive Simulation of Calorimeter Showers with Normalizing Flows",
+      "text": "Institut f¨ur Theoretische Physik, Universit¨at Heidelberg, Germany"
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "Inductive Simulation of Calorimeter Showers with Normalizing Flows",
+      "text": "(Dated: February 15, 2024)"
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "Inductive Simulation of Calorimeter Showers with Normalizing Flows",
+      "text": "Simulating particle detector response is the single most expensive step in the Large Hadron Collider computational pipeline. Recently it was shown that normalizing flows can accelerate this process while achieving unprecedented levels of accuracy, but scaling this approach up to higher resolutions relevant for future detector upgrades leads to prohibitive memory constraints. To overcome this problem, we introduce Inductive CaloFlow (iCaloFlow), a framework for fast detector simulation based on an inductive series of normalizing flows trained on the pattern of energy depositions in pairs of consecutive calorimeter layers. We further use a teacher-student distillation to increase sampling speed without loss of expressivity. As we demonstrate with Datasets 2 and 3 of the CaloChallenge2022, iCaloFlow can realize the potential of normalizing flows in performing fast, high-fidelity simulation on detector geometries that are ∼10 – 100 times higher granularity than previously considered."
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The computational resources required by the physics program of the Large Hadron Collider (LHC) are immense. In addition to the formidable demands set by the acquisition, reconstruction, and analysis of the physics events themselves, the physics goals of the LHC call for detailed and accurate simulations of these events. Such simulation requires even greater computer resources than the data acquisition and analysis itself (see [1–5] for recent reviews of the current status and future plans for LHC computing)."
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The most significant bottleneck (see e.g., Figure 1 of [2]) in simulating LHC events is modeling the response of the detector — and in particular that of the calorimeter — to incident particles using Geant4 [6–8]. As the highluminosity runs of the LHC progress, the demand for efficient simulation of collider events will only grow more pressing."
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "In recent years, a wide variety of deep generative models — including Generative Adversarial Networks (GANs), Variational AutoEncoder (VAE)-based models, normalizing flows, and diffusion models [9–30] — have demonstrated their potential for fast and accurate surrogate modeling of Geant4. The probability distribution of energy depositions within a calorimeter can be learned by neural networks trained on collections of Geant4 events, and then new simulated events can be produced from these networks much faster than running Geant4 itself. This approach has gone beyond proof-of-concept, with AtlFast3 [22] (the current official fast-simulation framework of the ATLAS collaboration) adopting a GAN for a portion of its calorimeter simulation."
+    },
+    {
+      "id": 9,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "To spur new solutions [23, 26, 27] to the problem of fast calorimeter simulation, the Fast Calorimeter Simulation Challenge 2022 (CaloChallenge2022) [31] presents three datasets [32–34], each with increasing numbers of detector segments. Previous work [26] showed that the CaloFlow method of [17, 18], based on normalizing flows [35–37] (see also [38, 39] for reviews), could be quite successful at fast and accurate emulation of Dataset 1 calorimeter showers. Generalizing the CaloFlow method to Datasets 2 [33] and 3 [34], which are a factor of ∼10 and ∼100 larger in dimensionality compared to Dataset 1, is the focus on this work."
+    },
+    {
+      "id": 10,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The primary obstacle to scaling the CaloFlow approach up to Datasets 2 and 3 is memory consumption. While normalizing flows are a powerful method for density estimation and generative modeling in high dimensional spaces, they can be very memory intensive, since they attempt to parametrize a bijective transformation between the data space and a latent space of the same dimension. Scaling the same architecture used in CaloFlow up to Datasets 2 and 3 would easily outstrip the locally available GPU memory, since the total number of model parameters scales as O(d2), where d is the data dimension. Only diffusion models have been applied to these high-dimensional dataset so far [23]."
+    },
+    {
+      "id": 11,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Recently, L2LFlows [28] was proposed in order to overcome this obstacle. L2LFlows is based on the physical intuition that — since particles propagate through the calorimeter primarily in one direction — the pattern of energy deposition in one layer should depend in large part on the pattern in the previous layers. Trained on a toy dataset (derived from the one used here [15, 19]) for the International Large Detector (ILD) [40, 41] of comparable size to Dataset 2, L2LFlows introduced one flow per calorimeter layer, conditioned on up to five previous layers through an embedding network. By not training a single flow to learn the voxel energies of the entire calorimeter, as was the case in [17, 18, 26], but instead breaking up the model into separate flows (each no larger than a single layer of the calorimeter), L2LFlows was able to keep the memory footprint of the model manageable while still scaling it up to a higher granularity calorimeter."
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "In this paper, we take the approach of L2LFlows one step further and replace the separate flows for each calorimeter layer with a single flow that generates the voxel energies in each layer, conditioned on the previous layer. This allows for the entire calorimeter shower to be learned inductively: training not on entire events over all layers, but rather on pairs of layers. Like in a mathematical induction proof, the initial layer is learned separately. Then, new events are simulated layer by layer, with the results for the ith layer serving as conditional input for the same normalizing flow now generating the (i + 1)th."
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "In more detail, our new framework, which we dub Inductive CaloFlow (iCaloFlow), uses three normalizing flows to learn and generate calorimeter events. First, Flow-1 learns the pattern of total energy deposition in each layer of the calorimeter, conditioned on the incident energy entering the detector. This is a relatively lowdimension dataset, with the dimension being the number of layers (45 for the examples used in this paper). Next, Flow-2 learns the pattern of normalized energy deposition within the first layer of the calorimeter, conditioned on the total energy deposited in the layer. Finally, Flow-3 learns the pattern of normalized energy deposition in the ith layer, conditioned on both the total energy deposited in the layer and the pattern of energy deposition in the previous (i −1)th layer. This last flow is trained simultaneously over the deposition pattern of every layer beyond the first."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "To achieve both high fidelity and ultra-fast generation speed, we follow the teacher-student method of CaloFlow. First we train Masked Autoregressive Flow (MAF) [42] versions of Flow-1, Flow-2 and Flow-3 on the Geant4 data. MAFs are fast in density estimation but slow (by a factor of O(d)) in generation. Then we fit “student” versions of Flow-2 and Flow-3 to their MAF teacher counterparts, using the technique of Probability Density Distillation (PDD) [43].1 The student models are Inverse Autoregressive Flows (IAFs) [44], which are fast in generation but slow in density estimation."
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "The result is a new deep learning architecture, capable of learning and quickly generating calorimeter events even for the largest detector layout of CaloChallenge2022. We quantify the fidelity of the events generated by both the iCaloFlow teacher and student flows, using a combination of histograms of physical features, classifierbased metrics (as in Ref. [17, 18, 26, 28]), and other metrics. We also measure and report on the generation speed of iCaloFlow for different batch sizes and hardware."
+    },
+    {
+      "id": 16,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "We reserve a detailed comparison with L2LFlows for future work: while such a comparison would be very interesting, it is non-trivial to perform. L2LFlows"
+    },
+    {
+      "id": 17,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "1 Flow-1 is not paired with an IAF as the output dimension is relatively small, and so generation time for the MAF is comparatively short."
+    },
+    {
+      "id": 18,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "was trained on a completely different dataset, comparable in size to Dataset 2, so direct comparisons are not possible without significant additional computational effort.2 Here we just note that the main differences with L2LFlows — using Flow-3 instead of separate flows for each calorimeter layer, and conditioning on the previous layer instead of up to five previous layers — make iCaloFlow significantly more memory efficient, but likely at the cost of being less expressive (and hence a worse fit to the data). The iCaloFlow IAF student model also results in a speed advantage over L2LFlows’s teacher-only MAF, again probably at the expense of fidelity."
+    },
+    {
+      "id": 19,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "In Section II, we describe the datasets we train our algorithm on and generate new data to compare against. In Section III, we describe the multiple flows that make up the iCaloFlow algorithm in detail, along with our training procedure for both the teacher and student. In Section IV, we show the results of our event generation, and use a classifier to quantitatively compare with the original dataset. We conclude in Section V."
+    },
+    {
+      "id": 20,
+      "page": 2,
+      "section": "II. CALOCHALLENGE DATA",
+      "text": "Datasets 2 and 3 [33, 34] of the CaloChallenge2022 [31] consist of 100k Geant4-simulated electron showers each, with incident energies sampled uniformly in log-space from 1 GeV to 1 TeV. The simulated detector volume has a cylindrical geometry of radius 80 cm, with 45 layers of active silicon detector (thickness 0.3 mm), alternating with inactive tungsten absorber layers (thickness 1.4 mm). The length of the voxel along the zaxis is 3.4 mm, which corresponds to two physical layers (tungsten-silicon-tungsten-silicon). Taking into account only the absorber value of radiation length (X0 = 3.504 mm) it makes the z-cell size equal 0.8 X0. Each detector layer is segmented in read-out voxel cells in the azimuthal angle α and radial distance r from the center of the cylindrical detector volume. The two datasets only differ in their voxelization. Dataset 2 has each layer divided into 9 concentric rings of voxels in the radial direction. Each ring is then divided into 16 voxels in α, for 144 voxels in each of the 45 layers (6480 for the entire detector). Dataset 3 has 18 radial segments and 50 azimuthal, for 900 voxels in the 45 layers (40500 total). Figure 1 shows the geometry of the voxels within a layer for both datasets, as well as the positioning of layers along the calorimeter axis."
+    },
+    {
+      "id": 21,
+      "page": 2,
+      "section": "II. CALOCHALLENGE DATA",
+      "text": "Each event record consists of the total energy of the incident electron Einc, together with the energy depositions recorded in each voxel Iia, where i is the layer index and a is the voxel index within the layer. The minimum energy deposition in each voxel is 15 keV. The"
+    },
+    {
+      "id": 22,
+      "page": 2,
+      "section": "II. CALOCHALLENGE DATA",
+      "text": "2 L2LFlows would have to be retrained on Dataset 2 and also generalized to Dataset 3 which is a factor of ∼10 larger."
+    },
+    {
+      "id": 23,
+      "page": 3,
+      "section": "II. CALOCHALLENGE DATA",
+      "text": "Dataset 2 Geometry Dataset 3 Geometry"
+    },
+    {
+      "id": 24,
+      "page": 3,
+      "section": "II. CALOCHALLENGE DATA",
+      "text": "FIG. 1. Geometry of the detector voxels in each layer for Dataset 2 (left) and Dataset 3 (center) and the three-dimensional geometry of Dataset 2 (right). Dataset 2 has 9 concentric rings, each divided into 16 voxels in α, while Dataset 3 has 18 rings, each divided into 50 segments. Both Dataset 2 and 3 contain 45 layers in depth (as shown for Dataset 2)."
+    },
+    {
+      "id": 25,
+      "page": 3,
+      "section": "II. CALOCHALLENGE DATA",
+      "text": "time required to generate a Geant4 shower depends strongly on the shower incident energy. It is approximately O(100 s) when averaged over the incident energies of these datasets [45], but the time required per shower is much longer for the showers with higher incident energies. Since the underlying detector geometry of Datasets 2 and 3 is the same and only the voxelization is different, the generation times with Geant4 are the same for both datasets."
+    },
+    {
+      "id": 26,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "The purpose of iCaloFlow (and of the CaloChallenge2022 generative modeling problem more generally) is to learn and sample from the conditional probability density p(Iia|Einc) that describes the Geant4 reference data. In Figure 2 we show a schematic of iCaloFlow, which consists of three flows:"
+    },
+    {
+      "id": 27,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "• Flow-1 learns the joint probability distribution of total energy deposited in each layer Ei, conditioned on the incident energy of the event Einc: p1(Ei|Einc). It is necessary to learn this probability distribution as Ei is a conditional input for Flow-2 and Flow-3 in the generation step. We found that removing Ei as a conditional input in Flow-2 and Flow-3 decreased the quality of our generated samples."
+    },
+    {
+      "id": 28,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "• Flow-2 learns the probability distribution of the unit-normalized voxel energies in the first layer of the calorimeter, ˆI1a ≡I1a/ P b I1b, conditioned on Einc and the energy deposited in the first layer, E1: p2"
+    },
+    {
+      "id": 29,
+      "page": 3,
+      "section": "A. Overview",
+      "text": ". Here a is the voxel index."
+    },
+    {
+      "id": 30,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "• Finally, Flow-3 learns the probability distribution of unit-normalized voxel energies in every layer after the first, ˆIia ≡Iia/ P b Iib for i ∈[2, 45], where the ith layer is conditioned on the energy deposited in the layers i and i −1 (Ei and Ei−1), Einc, the unit-normalized voxel energies in the (i−1)th layer"
+    },
+    {
+      "id": 31,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "ˆI(i−1)a, and the one-hot3 encoded layer number i:"
+    },
+    {
+      "id": 32,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "The conditional inputs, dimension of conditionals, and the outputs for each of the three flows are summarized in Table I. When generating new showers with iCaloFlow, first the nominal energies per layer ˜Ei are generated for a given incident Einc with Flow-14. Then the unitnormalized voxel energies ˆI1a of layer 1 is generated using Flow-2, conditioned on ˜E1 and Einc. Finally, the normalized voxel energies ˆIia of layers i = 2, . . . , 45 are generated sequentially (inductively), using Flow-3 with the conditional inputs of the previous layer’s ˆI distribution provided by Flow-2 (for generating Layer 2) or Flow-3 (for all subsequent layers). By generating all layers beyond the first from a single normalizing flow rather than each layer separately as in L2LFlows [28], our model is far more efficient in memory usage. The potential downsides are that training cannot be trivially parallelized and our model may be less expressive."
+    },
+    {
+      "id": 33,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "One important subtlety with the construction of iCaloFlow is that Flow-2 and Flow-3 cannot learn the unit-normalization constraint of the ˆIia training data perfectly. In practice, the sum of the generated showers will be distributed around unity, and there will always be some mismatch between the nominal layer energy generated by Flow-1 and the actual layer energy produced by the combination of all three flows. We will address"
+    },
+    {
+      "id": 34,
+      "page": 3,
+      "section": "A. Overview",
+      "text": "3 One-hot encoding is used for layer numbers instead of ordinal encoding using the layer number directly, because other than the location in the detector, there is no information in the layer number, i.e., layer 30 is not 15 times more important than layer 2. 4 This does not directly correspond to the energy deposited in the layer, Ei, see the discussion on postprocessing below."
+    },
+    {
+      "id": 35,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "FIG. 2. Schematic of the three iCaloFlow flows. Solid lines are bidirectional — the direction into each flow denotes the density estimation step and the direction out of the flow denotes the sample generation step. Note that there are postprocessing steps (see main text) after each generation step, which are omitted in the schematic. Dashed lines indicate the conditional input to the respective flows. Flow-3 is used iteratively on subsequent layers."
+    },
+    {
+      "id": 36,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "this mismatch here5 by taking the latter as the actual layer energy: after multiplying ˆIia with the output of Flow-1 and applying a minimum energy threshold of Emin = 15 keV to obtain Iia, we take the sum over voxels a as the total energy in the layer:"
+    },
+    {
+      "id": 37,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "˜EiˆIiaΘ( ˜EiˆIia −Emin). (1)"
+    },
+    {
+      "id": 38,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "We will think of the output of Flow-1 as just an intermediate step needed for the subsequent conditioning, and refer to output of Flow-1 when generating new events as the proxy ˜Ei. We note that referring to the output of a flow as a proxy for the distributions it was trained on is non-standard, but necessary in this case due to the differences in normalization and the multiple ways of defining the energy deposited in a layer. In a sense, also the the normalized shower shapes ˆIia that Flow-2 and Flow- 3 learn can be thought of as proxies, since the resulting samples need to be unnormalized and thresholded as a postprocessing step,"
+    },
+    {
+      "id": 39,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "Iia = ˜EiˆIiaΘ( ˜EiˆIia −Emin). (2)"
+    },
+    {
+      "id": 40,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "5 This problem is also present in the previous iterations of CaloFlow [17, 18, 26] and in L2LFlows [28], but differences in the reference datasets led to different treatments of the problem. For more details, see Appendix A."
+    },
+    {
+      "id": 41,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "Conditionals Dim of conditional"
+    },
+    {
+      "id": 42,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "Output"
+    },
+    {
+      "id": 43,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "Flow-1 Einc 1 Flow-2 Einc, E1 2 ˆI1a Flow-3 Einc, Ei, Ei−1, ˆI(i−1)a, i 191 or 947 ˆIia"
+    },
+    {
+      "id": 44,
+      "page": 4,
+      "section": "A. Overview",
+      "text": "TABLE I. The conditional inputs for each flow, and the features whose probability distributions are the output of each flow (for both teachers and their paired student). Einc is the incident energy of the particle, Ei (i = 1, . . . , 45) is the total energy deposited in layer i, ˜Ei is a proxy for Ei (see text), and ˆIia is the pattern of normalized energy deposition in the voxels a in layer i. For Flow-3, Dataset 2 has smaller conditional dimension (191) compared to Dataset 3 (947)."
+    },
+    {
+      "id": 45,
+      "page": 4,
+      "section": "B. Architectures",
+      "text": "1. Teacher MAFs"
+    },
+    {
+      "id": 46,
+      "page": 4,
+      "section": "B. Architectures",
+      "text": "The iCaloFlow teacher flows (including Flow-1) are MAFs [42], which learn a bijective transformation f between a latent space z, with a simple N-dimensional probability distribution,6 and the target space x. For consistency with the “forward” function of the code, we define z = f(x)."
+    },
+    {
+      "id": 47,
+      "page": 4,
+      "section": "B. Architectures",
+      "text": "6 In this work, the latent space follows an N-dimensional Gaussian distribution."
+    },
+    {
+      "id": 48,
+      "page": 5,
+      "section": "B. Architectures",
+      "text": "Following [17, 18, 26], all three teacher flows use compositions of rational quadratic spline (RQS) transformations [46] as their transformation function f. The neural networks defining the parameters⃗κ of the RQS consist of MADE blocks [47]. The MADE blocks allow for tractable training given the large dimensionality of the training data for Flow-2 and Flow-3, at the cost of longer evaluation time for generating new events. For details of the architectures used for the teacher flows, see Table II."
+    },
+    {
+      "id": 49,
+      "page": 5,
+      "section": "B. Architectures",
+      "text": "2. Student IAFs"
+    },
+    {
+      "id": 50,
+      "page": 5,
+      "section": "B. Architectures",
+      "text": "Though the three MAFs are capable of generating complete events simulating the Geant4 output, the sampling time is quite slow. While this is not a particular concern for Flow-1, the sampling time is an issue especially for Flow-3, which has a large output dimension and must be sampled 44 times sequentially (i.e., cannot be parallelized) in order to generate a single event."
+    },
+    {
+      "id": 51,
+      "page": 5,
+      "section": "B. Architectures",
+      "text": "The solution proposed in [18], which we carry over here to Datasets 2 and 3 of CaloChallenge2022, is to pair every slow-sampling MAF (i.e., Flow-2 and Flow-3) with a fast-sampling Inverse Autoregressive Flow (IAF). Since training the IAF with a negative log-likelihood of the probability of the data is prohibitively slow, the IAF is trained by fitting it to a pre-trained MAF using the Probability Density Distillation (PDD) method developed in [18]. The goal of this training is for the IAF to learn fIAF = fMAF, or equivalently — since only the fast passes through the flows can be used meaningfully for optimization — to have fMAF and f −1"
+    },
+    {
+      "id": 52,
+      "page": 5,
+      "section": "B. Architectures",
+      "text": "IAF be each other’s inverse. For more details of the training and loss terms, see Sec. III C 2 and [18]."
+    },
+    {
+      "id": 53,
+      "page": 5,
+      "section": "B. Architectures",
+      "text": "In order to carry out the PDD method, we require fIAF = fMAF at every individual step of the normalizing flow. Hence, the IAF must be composed of the same number of MADE-RQS blocks as its corresponding pre-trained MAF. However, the hidden layer sizes in the blocks can be different. We use a larger hidden layer, with 384 nodes, for Flow-3 student which led to better performance in Dataset 2. For Dataset 3, Flow-3 student has the same hidden layer size (256 nodes) as the teacher due to memory constraints. For a detailed listing of the architecture hyperparameters for the student IAFs, see Table II."
+    },
+    {
+      "id": 54,
+      "page": 5,
+      "section": "C. Training",
+      "text": "Prior to training the teachers and students, we must standardize and preprocess the datasets. New events generated from the trained flows will be in the standardized space, and thus the transformations are inverted to produce events in the physical units. We detail this process for all three flows in Appendix A. The same preprocessing was used when training both the teachers and students."
+    },
+    {
+      "id": 55,
+      "page": 5,
+      "section": "C. Training",
+      "text": "FIG. 3. Illustration of OneCycle LR schedule with annihilation phase [26]."
+    },
+    {
+      "id": 56,
+      "page": 5,
+      "section": "C. Training",
+      "text": "1. Teachers"
+    },
+    {
+      "id": 57,
+      "page": 5,
+      "section": "C. Training",
+      "text": "The teacher MAFs are trained using the mean negative log-likelihood of the data evaluated on the output of the MAF as the loss function,"
+    },
+    {
+      "id": 58,
+      "page": 5,
+      "section": "C. Training",
+      "text": "Lteacher, 1 = −⟨log p1(Ei|Einc)⟩, (3)"
+    },
+    {
+      "id": 59,
+      "page": 5,
+      "section": "C. Training",
+      "text": "All teacher MAFs in this work are trained with independent Adam optimizers [48]."
+    },
+    {
+      "id": 60,
+      "page": 5,
+      "section": "C. Training",
+      "text": "Given the different sizes of Datasets 2 and 3, we use a slightly different training strategy for the two datasets. We use 70k samples of Dataset 2 for training the flows and the remaining 30k samples for model selection. The OneCycle learning rate (LR) schedule [49] was implemented for all three flows. With this LR schedule (see Figure 3), the LR begins at a chosen base LR and is updated after each batch such that it increases up to a maximum LR. After this, the LR is made to decrease from the maximum LR to the base LR. The schedule finishes with an annihilation phase where the base LR is further decreased up to a factor of 10. As in [26], we find that using the OneCycle LR schedule for Dataset 2 enabled us to obtain a lower training loss within a shorter number of epochs. We show a summary of the training hyperparameters in Table III. The reason for the smaller number of epochs in Flow-3 compared to the other ones is that the dataset is now 44 times larger (consisting of data from layer i and i −1 for i ∈[2, 45])."
+    },
+    {
+      "id": 61,
+      "page": 5,
+      "section": "C. Training",
+      "text": "Training Flow-1 and Flow-2 for Dataset 3 uses a similar strategy as used for Dataset 2. However, a different learning rate schedule was used when training the flows for Dataset 3. Note that the CaloChallenge2022 provides Dataset 3 as two files of 50k events each (Files 1 and 2). For the first stages of training, we combine the showers of these two files into one dataset with 100k showers — 70k of these are used for training and the remaining 30k are used for model selection."
+    },
+    {
+      "id": 62,
+      "page": 5,
+      "section": "C. Training",
+      "text": "We train Flow-3 for Dataset 3 in two stages. First, we train it for 20 epochs using 40k samples from File 1 for training and 10k for model selection. Then, using the dim of number of layer sizes number of base distribution MADE blocks input hidden output RQS bins"
+    },
+    {
+      "id": 63,
+      "page": 6,
+      "section": "C. Training",
+      "text": "Flow-1 45 8 256 1 × 256 1035 8 Flow-2 teacher 144 8 256 2 × 256 3312 8 Flow-2 student 144 8 256 2 × 256 3312 8 Flow-3 teacher 144 8 256 2 × 256 3312 8 Flow-3 student 144 8 384 2 × 384 3312 8"
+    },
+    {
+      "id": 64,
+      "page": 6,
+      "section": "C. Training",
+      "text": "DS2"
+    },
+    {
+      "id": 65,
+      "page": 6,
+      "section": "C. Training",
+      "text": "Flow-1 45 8 256 1 × 256 1035 8 Flow-2 teacher 900 8 256 2 × 256 20700 8 Flow-2 student 900 8 256 2 × 256 20700 8 Flow-3 teacher 900 8 256 1 × 256 20700 8 Flow-3 student 900 8 256 1 × 256 20700 8"
+    },
+    {
+      "id": 66,
+      "page": 6,
+      "section": "C. Training",
+      "text": "DS3"
+    },
+    {
+      "id": 67,
+      "page": 6,
+      "section": "C. Training",
+      "text": "TABLE II. Summary of architecture of the various MAF teacher and IAF student models used in iCaloFlow. For the hidden layer sizes, the first number is the number of hidden layers in each MADE block and the second number is the number of nodes in each hidden layer (e.g., 2 × 256 refers to 2 hidden layers per MADE block with 256 nodes per hidden layer)."
+    },
+    {
+      "id": 68,
+      "page": 6,
+      "section": "C. Training",
+      "text": "same optimizer, we train Flow-3 for another 20 epochs using 40k samples of File 2. We again use the remaining 10k samples for model selection. Simultaneous handling of all 100k showers was not possible due to prohibitive memory requirements. A multistep LR schedule was used when training the Dataset 3 teacher flows, where we halve a chosen initial LR after epochs 400 and 500 (see Table III for summary of training hyperparameters). We found that training the flows with OneCycle LR schedule resulted in a slightly poorer performance for Dataset 3."
+    },
+    {
+      "id": 69,
+      "page": 6,
+      "section": "C. Training",
+      "text": "For Flow-1 and Flow-2 of both datasets, the epoch with the lowest test loss is selected for subsequent sample generation. For Flow-3 of both datasets, due to the large training data, the test loss is evaluated after every 250 batches and also at the end of each epoch. The model checkpoint with the lowest test loss is selected for subsequent sample generation."
+    },
+    {
+      "id": 70,
+      "page": 6,
+      "section": "C. Training",
+      "text": "2. Students"
+    },
+    {
+      "id": 71,
+      "page": 6,
+      "section": "C. Training",
+      "text": "The main idea behind teacher-student training of the IAF via PDD is to enforce that they are each other’s inverses using only their fast passes:"
+    },
+    {
+      "id": 72,
+      "page": 6,
+      "section": "C. Training",
+      "text": "IAF(fMAF(x)), (6) and"
+    },
+    {
+      "id": 73,
+      "page": 6,
+      "section": "C. Training",
+      "text": "IAF(z)). (7)"
+    },
+    {
+      "id": 74,
+      "page": 6,
+      "section": "C. Training",
+      "text": "We refer to these conditions as x-pass and z-pass, respectively. For each of the passes, we can construct a set of mean-squared error (MSE) losses that force the IAF to converge to the MAF:"
+    },
+    {
+      "id": 75,
+      "page": 6,
+      "section": "C. Training",
+      "text": "Lx = MSE"
+    },
+    {
+      "id": 76,
+      "page": 6,
+      "section": "C. Training",
+      "text": "Lz = MSE"
+    },
+    {
+      "id": 77,
+      "page": 6,
+      "section": "C. Training",
+      "text": "IAF(z))"
+    },
+    {
+      "id": 78,
+      "page": 6,
+      "section": "C. Training",
+      "text": "In addition, [18] proposed two more MSE loss terms (which we will refer to as Lx−MADE and Lz−MADE here) that enforce the agreement between MAF and IAF at the level of the outputs and parameters of each individual MADE block (see [18] for details). These were found to improve the performance of the teacher-student training and we also include them here."
+    },
+    {
+      "id": 79,
+      "page": 6,
+      "section": "C. Training",
+      "text": "When training the Flow-2 students, we were able to achieve good agreement between the teachers and students by using the same loss function as in [18]:"
+    },
+    {
+      "id": 80,
+      "page": 6,
+      "section": "C. Training",
+      "text": "L = (Lx + Lx−MADE) + (Lz + Lz−MADE) . (10)"
+    },
+    {
+      "id": 81,
+      "page": 6,
+      "section": "C. Training",
+      "text": "However, for Flow-3 students, using the same loss function resulted in a significant disagreement between the teachers and students for some distributions. Instead, we found that training with x-loss only,"
+    },
+    {
+      "id": 82,
+      "page": 6,
+      "section": "C. Training",
+      "text": "˜L = Lx + Lx−MADE (11) resulted in better agreement. We note that a similar behavior was found in [50] where the loss constructed only using the x-pass was more robust to the large dimensionality of the training data."
+    },
+    {
+      "id": 83,
+      "page": 6,
+      "section": "C. Training",
+      "text": "When training each student using PDD, the ratio of the data used for training and model selection was chosen to match that of the corresponding teacher. Like the teacher MAFs, all the student IAFs are trained with independent Adam optimizers [48]. The OneCycle LR schedule was implemented for all the student IAFs and the details of the training hyperparameters are shown in Table III. Note that a smaller batch size was used when training Dataset 3 student flows due to memory constraints."
+    },
+    {
+      "id": 84,
+      "page": 6,
+      "section": "C. Training",
+      "text": "For Flow-1 and Flow-2 of both datasets, the epoch with the lowest mean Kullback–Leibler (KL) divergence7"
+    },
+    {
+      "id": 85,
+      "page": 6,
+      "section": "C. Training",
+      "text": "7 The KL divergence between the student s(x) and teacher t(x)"
+    },
+    {
+      "id": 86,
+      "page": 7,
+      "section": "C. Training",
+      "text": "Trained with multistep LR Initial LR Epochs Batch size"
+    },
+    {
+      "id": 87,
+      "page": 7,
+      "section": "C. Training",
+      "text": "Flow-1 1 × 10−4 750 1000 Flow-2 1 × 10−4 750 1000 Flow-3 1 × 10−4 20+20 500"
+    },
+    {
+      "id": 88,
+      "page": 7,
+      "section": "C. Training",
+      "text": "Trained with OneCycle LR base LR max LR Epochs Batch size"
+    },
+    {
+      "id": 89,
+      "page": 7,
+      "section": "C. Training",
+      "text": "Flow-1 1 × 10−5 1 × 10−4 500 1000 Flow-2 2 × 10−5 1 × 10−3 200 1000 Flow-3 2 × 10−5 1 × 10−3 60 1000"
+    },
+    {
+      "id": 90,
+      "page": 7,
+      "section": "C. Training",
+      "text": "DS2 student Flow-2 2 × 10−5 1 × 10−3 400 1000 Flow-3 2 × 10−5 5 × 10−4 100 1000"
+    },
+    {
+      "id": 91,
+      "page": 7,
+      "section": "C. Training",
+      "text": "DS3 student Flow-2 2 × 10−5 1 × 10−3 400 100 Flow-3 4 × 10−6 1 × 10−4 15+15 100"
+    },
+    {
+      "id": 92,
+      "page": 7,
+      "section": "C. Training",
+      "text": "TABLE III. Hyperparameters used when training Dataset 2 and 3 iCaloFlow models. For Dataset 3 Flow-3, the number of epochs is written as N + N to indicate that we trained the flow for N epochs on samples of File 1, followed by another N epochs on samples of File 2."
+    },
+    {
+      "id": 93,
+      "page": 7,
+      "section": "C. Training",
+      "text": "is selected for subsequent sample generation. For Flow- 3 of both datasets, due to the large training data, the intermediate mean KL divergence of each epoch is evaluated after every 250 batches, while the final mean KL divergence is evaluated at the end of each epoch. The model checkpoint with the lowest evaluated mean KL divergence is selected for subsequent sample generation."
+    },
+    {
+      "id": 94,
+      "page": 7,
+      "section": "IV. RESULTS",
+      "text": "After training teacher and student flows on Datasets 2 and 3, respectively, we generate 100k calorimeter showers from each model for each dataset. Incident energies are uniformly sampled from log-space between 1 GeV and 1 TeV — the same range and distribution of energies as the training data."
+    },
+    {
+      "id": 95,
+      "page": 7,
+      "section": "A. Shower images",
+      "text": "In Figure 4, we show the pattern of energy deposition in all layers for two example events from Dataset 2 (one with Einc = 693 GeV and one with 86 GeV), compared with two events generated by iCaloFlow with equal incident energies. (Similar plots for Dataset 3 events are difficult to visualize clearly due to the density of voxels.) In Figure 5, we show the pattern of energy deposition in layers 1, 10, 20, and 45, averaged over all the events in the dataset for both Dataset 3 and the sampled events from iCaloFlow."
+    },
+    {
+      "id": 96,
+      "page": 7,
+      "section": "B. Distributions",
+      "text": "We next consider more detailed diagnostic plots, comparing the distribution of various high-level features between the Geant4, teacher, and student events. First, we examine the energy deposition in each layer (again noting this is obtained by the sum of the voxel energies output from Flow-2 and Flow-3). In Figure 6, we show the energies deposited in each layer, averaged over all the generated showers, which we denote by ⟨Ei⟩. As expected, the generated distributions are similar for both Datasets 2 and 3, with small variations due to the different training regimes and normalization differences in the output of the flows. The output of the student networks largely follows that of the teachers, with the most significant deviations at both low and high layer numbers."
+    },
+    {
+      "id": 97,
+      "page": 7,
+      "section": "B. Distributions",
+      "text": "In Figure 7, we show the total energy deposition Ei within a layer for our selected set of layers (i = 1, 10, 20, 45). Here we see good overall agreement between Geant4 and iCaloFlow distribution, with the exception of Layer 1 due to our choice of postprocessing. In particular, our decision not to normalize the outputs of Flow-2 and Flow-3 to unity results in a difference between the energy deposited in a layer Ei and the proxy output of Flow-1, ˜Ei. On the other hand, we find that the teacher voxel energy distributions in Figures 8 and 9 are generally in good agreement with the Geant4 distributions. (As discussed further in Appendix A, enforcing Ei = ˜Ei would “fix” the distribution in Fig. 7, but at the cost of creating an excess of low-energy voxels in Figs. 8 and 9.) However, the student distributions suffer from an excess at low voxel energies. We found that this discrepant behavior is largely due to our choice of noise that is added to voxel energies during preprocessing. However, the addition of noise is necessary in our setup to ensure that the flow does not only learn zero energy voxels [17]. Note that many voxels have zero energy deposition, which are not captured in this logarithmic plot."
+    },
+    {
+      "id": 98,
+      "page": 7,
+      "section": "B. Distributions",
+      "text": "We show the ratio of energy deposited in a layer to the incident beam energy in Figure 10, and the ratio of all deposited energy to the incident beam energy in Figure 11. There is good overall agreement between iCaloFlow and Geant4 events despite some excess at low ratios in the earlier layers. We observed that the showers in the low ratio excess in Layer 1 in these figures are the same showers found in the low energy excess in Layer 1 shown in Figure 7. These showers are characterized by having mostly zero energy voxels with a few bright voxels, this makes it difficult for the flow to learn the underlying distribution."
+    },
+    {
+      "id": 99,
+      "page": 7,
+      "section": "B. Distributions",
+      "text": "We turn now to other aspects of the pattern of energy deposition within each layer. First, we consider the sparsity f0 for each layer, defined as the fraction of voxels that have non-zero energy deposition and shown in Figure 12. We note that the lowest and highest layer numbers have larger fraction of zero energy voxels. It appears to be"
+    },
+    {
+      "id": 100,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "Dataset 2, Einc = 693 GeV"
+    },
+    {
+      "id": 101,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "Teacher, Einc = 693 GeV"
+    },
+    {
+      "id": 102,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "Student, Einc = 693 GeV"
+    },
+    {
+      "id": 103,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "Dataset 2, Einc = 86 GeV"
+    },
+    {
+      "id": 104,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "Teacher, Einc = 86 GeV"
+    },
+    {
+      "id": 105,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "Student, Einc = 86 GeV"
+    },
+    {
+      "id": 106,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "FIG. 4. Pattern of energy deposition from two example events generated by Geant4 in Dataset 2 (top row), iCaloFlow teacher (middle row), and iCaloFlow student (bottom row). Events have Einc = 693 GeV (left column) and Einc = 86 GeV (right column). For visual clarity, voxels with less than 1 MeV of energy have been suppressed. The beam axis is shown with a black line. For display purposes, the separation between layers and voxels within a layer have both been artificially increased from the real detector geometry."
+    },
+    {
+      "id": 107,
+      "page": 8,
+      "section": "B. Distributions",
+      "text": "more difficult for iCaloFlow to learn distributions in these layers with small f0 as evident from the deviations found in distributions discussed in this section. In Figures 13 (Dataset 2) and 14 (Dataset 3), we show boxand-whisker plots of the distribution of energy deposited within all voxels in each radial ring within the layer (9 such rings in the geometry of Dataset 2, each with 16 voxels. Dataset 3 has 18 rings in increasing radius, each"
+    },
+    {
+      "id": 108,
+      "page": 9,
+      "section": "B. Distributions",
+      "text": "FIG. 5. Averaged energy deposition pattern of events in layers 1, 10, 20, and 45 (from left to right) for the Geant4 data in Dataset 3 (top row), events sampled from iCaloFlow teacher trained on Dataset 3 (middle row), and events sampled from iCaloFlow student trained on Dataset 3 (bottom row) with 50 voxels). In the main plots of Figures 13 and 14, we show the average distribution of all voxels with non-zero energy deposition. Beneath, we show the averaged sparsity of the voxels within the ring. These distributions have good agreement between the Geant4 and iCaloFlow events."
+    },
+    {
+      "id": 109,
+      "page": 9,
+      "section": "B. Distributions",
+      "text": "As a final comparison of the pattern of energy distribution, in Figure 15 we show the distribution of the centers of energy along the x axis of the detector for our representative layer. The center of energy Cj along a coordinate (j = x or y) is defined as the sum of the energy deposited in each voxel times the voxel’s coordinate distance from the origin, normalized by the total energy deposited. We show only Cx, as the distribution of Cy is statistically identical due to the symmetry of the detector around the incident beam. Again, we see the largest deviations in the tails of the centers of energy for the early and late layers of Dataset 3."
+    },
+    {
+      "id": 110,
+      "page": 9,
+      "section": "B. Distributions",
+      "text": "While these plots capture only a limited set of diagnostic criteria for the generated events as compared to the Geant4 data, it appears that many of the distributions match well. The most glaring and important exceptions are at low deposited energies, most notably in early layers (see Figure 7 for example)."
+    },
+    {
+      "id": 111,
+      "page": 9,
+      "section": "C. Classifier Metrics",
+      "text": "The histograms and averaged deposition patterns of the generated events as compared to the Geant4 data suggest that iCaloFlow can match many of the properties of the data. Given the complexity of the events however, these simple distributions may not capture correlations within events, thereby giving a misleading impression of the accuracy of the sampler. We wish to more quantitatively determine if the generated probability distribution pgenerated is identical to that of the data pdata."
+    },
+    {
+      "id": 112,
+      "page": 9,
+      "section": "C. Classifier Metrics",
+      "text": "To answer this question, we follow the conventions of"
+    },
+    {
+      "id": 113,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "Dataset 2 Teacher Student"
+    },
+    {
+      "id": 114,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "0 10 20 30 40 Layer Number i"
+    },
+    {
+      "id": 115,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "Dataset 3 Teacher Student"
+    },
+    {
+      "id": 116,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "0 10 20 30 40 Layer Number i"
+    },
+    {
+      "id": 117,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 6. Averaged total energy deposition ⟨Ei⟩for each layer i for Datasets 2 (left) and 3 (right). In each plot the averaged energy of the Geant4 data is shown in black, and the distribution generated by iCaloFlow teacher (student) in red (blue). The fractional difference ∆between the truth-level and generated distributions is shown below the main figures."
+    },
+    {
+      "id": 118,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E1 (MeV)"
+    },
+    {
+      "id": 119,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E10 (MeV)"
+    },
+    {
+      "id": 120,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E1 (MeV)"
+    },
+    {
+      "id": 121,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E10 (MeV)"
+    },
+    {
+      "id": 122,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E20 (MeV)"
+    },
+    {
+      "id": 123,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E45 (MeV)"
+    },
+    {
+      "id": 124,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E20 (MeV)"
+    },
+    {
+      "id": 125,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 100 102 104 E45 (MeV)"
+    },
+    {
+      "id": 126,
+      "page": 10,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 7. Histograms of total energy deposited in a layer i (Ei), for i = 1, 10, 20, and 45 (from left to right), for Dataset 2 (top row) and Dataset 3 (bottom row). Distribution of Geant4 data is shown as black lines, and that of the iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue)."
+    },
+    {
+      "id": 127,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 8. Histograms of energy deposition per voxel in the layers 1, 10, 20, and 45 (from left to right) for Dataset 2 (upper row) and Dataset 3 (lower row). Distributions of Geant4 data are shown as black lines, and those of iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue)."
+    },
+    {
+      "id": 128,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "All layers"
+    },
+    {
+      "id": 129,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 101 104 Ia (MeV)"
+    },
+    {
+      "id": 130,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "All layers"
+    },
+    {
+      "id": 131,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "10−2 101 104 Ia (MeV)"
+    },
+    {
+      "id": 132,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 9. Histograms of energy deposition per voxel in all layers for Dataset 2 (left) and Dataset 3 (right). Distributions of Geant4 data are shown as black lines, and those of iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue)."
+    },
+    {
+      "id": 133,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "[17, 18], and use a binary classifier trained to distinguish the Geant4 and generated events [51]. (Such binary classifiers can also be used to reweight generative models to improve their fidelity, see [52].) Table IV shows the results of 10 independent classifier runs on generated events from both datasets. “Low-level features” refers to all energy depositions per voxel (normalized with Einc and multiplied by a factor 100) and Einc itself (preprocessed as log10 Einc). “High-level features” are the incident energy (preprocessed as log10 Einc), the energy deposited in each of the layers (preprocessed as log10 (Ei + 10−8)), the center of energy in the x and y directions (normalized with a factor 100), and the width of the x and y distributions (normalized with a factor 100). More details on the architecture and trainings procedure can be found in Appendix B."
+    },
+    {
+      "id": 134,
+      "page": 11,
+      "section": "C. Classifier Metrics",
+      "text": "In Table IV, the results of the classifier runs are presented as AUC and JSD scores. According to the"
+    },
+    {
+      "id": 135,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 10. Histograms of the ratio of total energy deposited and incident energy in a layer i (Ei), for i = 1, 10, 20, and 45 (from left to right), for Dataset 2 (top row) and Dataset 3 (bottom row). Distribution of Geant4 data is shown as black lines, and that of the iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue)"
+    },
+    {
+      "id": 136,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "All layers"
+    },
+    {
+      "id": 137,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "All layers"
+    },
+    {
+      "id": 138,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 11. Histograms of the ratio of total energy deposition (all layers) and incident energy for Dataset 2 (left) and Dataset 3 (right). Distributions of Geant4 data are shown as black lines, and those of iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue)."
+    },
+    {
+      "id": 139,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "Neyman-Pearson lemma, we expect the AUC to be 0.5 if the true and generated probability densities are equal. The AUC is 1 if the classifier is able to perfectly distinguish between generated and true samples. The second metric, JSD ∈[0, 1], is the Jensen-Shannon divergence which also measures the similarity between the two probability distributions. The JSD is 0 if the two distributions are identical and 1 if they are disjoint."
+    },
+    {
+      "id": 140,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "In our study, we find that iCaloFlow is able to produce generated samples of sufficiently high fidelity for Dataset 2 to fool the classifier. This is evident by the Dataset 2 teacher and student classifier scores being clearly less than unity in Table IV."
+    },
+    {
+      "id": 141,
+      "page": 12,
+      "section": "C. Classifier Metrics",
+      "text": "In contrast, the AUC scores for our Dataset 3 teacher and student models are all > 0.9, which indicates lower fidelity. Also, the high-level scores are greater than the low-level scores for our Dataset 3 models. This is likely due to the low-level classifier having insufficient capacity to separate the iCaloFlow and Geant4 Dataset 3 samples. It would be interesting to explore more sophisticated architectures to improve the classification performance of the low-level classifier, but we save this for"
+    },
+    {
+      "id": 142,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "FIG. 12. Histograms of fraction of voxels in layers 1, 10, 20, and 45 (from left to right) which have non-zero energy deposition f0 for Dataset 2 (upper row) and Dataset 3 (lower row). Distributions of Geant4 data are shown as black lines, and those of the iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue)."
+    },
+    {
+      "id": 143,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "future work."
+    },
+    {
+      "id": 144,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "In general, the teacher models performed better than the student models at the classifier tests. This is to be expected since the students require a second distillation step, and it is not surprising that some fidelity is lost in the process."
+    },
+    {
+      "id": 145,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "Finally, we note that the authors of CaloScore [23] have produced results for Datasets 2 and 3 using a scorebased diffusion model. They performed a similar classifier test on their samples and obtained an AUC of 0.98 for both datasets."
+    },
+    {
+      "id": 146,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "low-level features high-level features"
+    },
+    {
+      "id": 147,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "AUC JSD AUC JSD"
+    },
+    {
+      "id": 148,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "DS2 teacher 0.797(5) 0.210(7) 0.798(3) 0.214(5)"
+    },
+    {
+      "id": 149,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "DS2 student 0.840(3) 0.286(5) 0.838(2) 0.283(4)"
+    },
+    {
+      "id": 150,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "DS3 teacher 0.911(3) 0.465(6) 0.941(1) 0.561(3)"
+    },
+    {
+      "id": 151,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "DS3 student 0.910(8) 0.462(18) 0.951(1) 0.601(5)"
+    },
+    {
+      "id": 152,
+      "page": 13,
+      "section": "C. Classifier Metrics",
+      "text": "TABLE IV. Mean and standard deviation of 10 independent classifier runs."
+    },
+    {
+      "id": 153,
+      "page": 13,
+      "section": "D. Timing",
+      "text": "Shower generation timings for different generation batch sizes are shown in Table V. The speedups going"
+    },
+    {
+      "id": 154,
+      "page": 13,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "TABLE V. Average time taken to generate a single shower event by iCaloFlow teacher and student models for Datasets 2 and 3. The timing was computed for different generation batch sizes on our Intel Core i9-7900X CPU and our TITAN V GPU. We were not able to generate shower events on the CPU for large batch sizes due to memory constraints."
+    },
+    {
+      "id": 155,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "Layer 1"
+    },
+    {
+      "id": 156,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 157,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "Layer 20"
+    },
+    {
+      "id": 158,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 159,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "Layer 10"
+    },
+    {
+      "id": 160,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 161,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "Layer 45"
+    },
+    {
+      "id": 162,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "1 2 3 4 5 6 7 8 9 Radial Layer"
+    },
+    {
+      "id": 163,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "FIG. 13. Box and whisker plots showing the distribution of energy deposited in each ring of voxels at fixed radial distance from the beam line (9 such rings for Dataset 2) in layers 1, 10, 20, and 45 of Dataset 2. Geant4 data are shown in black, iCaloFlow teacher (student) events in red (blue). Each box extends from the first quartile of energies greater than zero to the third quartile. The whiskers extend from the 5th to 95th percentile of the non-zero energy deposition. Lower subplots show f0, the average fraction of voxels in each radial ring with zero energy deposition."
+    },
+    {
+      "id": 164,
+      "page": 14,
+      "section": "Model Batch size GPU times (ms) CPU times (ms)",
+      "text": "from teacher to student are the expected O(d), where d is the dimensionality of a single layer (144 for DS2 and 900 for DS3). On the GPU, iCaloFlow is generally faster than Geant4, which takes approximately 100 s per event, except for Dataset 3 teacher with a generation batch size of 1. On the CPU, iCaloFlow is still faster than Geant4 for both Dataset 2 models and also Dataset 3 student. With the student models, we were able to generate a single shower on the GPU as quickly as 1.34 ms (5.87 ms) for Dataset 2 (3) — O(105) faster than Geant4."
+    },
+    {
+      "id": 165,
+      "page": 14,
+      "section": "V. CONCLUSIONS",
+      "text": "In this paper, we have introduced a new approach to generating highly-granular calorimeter showers with normalizing flows. This is the first flow-based approach that has been applied to calorimeter shower data with dimensionality as large as Dataset 3 of CaloChallenge2022. Instead of learning the joint distribution of all voxels, we focus on the distribution per calorimeter layer and use an inductive algorithm to generate the sample. This approach is inspired by the physical nature of the shower, which starts to develop close to the entry point of the incoming particle and evolves deeper into the detector."
+    },
+    {
+      "id": 166,
+      "page": 14,
+      "section": "V. CONCLUSIONS",
+      "text": "Previous approaches used separately trained flows for each layer [28], while we use a single flow for the step"
+    },
+    {
+      "id": 167,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "Layer 1"
+    },
+    {
+      "id": 168,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 Radial Layer"
+    },
+    {
+      "id": 169,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "Layer 20"
+    },
+    {
+      "id": 170,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 Radial Layer"
+    },
+    {
+      "id": 171,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "Layer 10"
+    },
+    {
+      "id": 172,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 Radial Layer"
+    },
+    {
+      "id": 173,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "Layer 45"
+    },
+    {
+      "id": 174,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 Radial Layer"
+    },
+    {
+      "id": 175,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "FIG. 14. Box and whisker plots showing the distribution of energy deposited in each ring of voxels at fixed radial distance from the beam line (18 such rings for Dataset 3) in Layers 1, 10, 20, and 45 of Dataset 3. Geant4 data are shown in blue, iCaloFlow events in red. Each box extends from the first quartile of energies greater than zero to the third quartile. The whiskers extend from the 5th to 95th percentile of the non-zero energy deposition. Lower subplots show f0, the average fraction of voxels in each radial ring with zero energy deposition."
+    },
+    {
+      "id": 176,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "of generating layer i based on the shower in layer i −1 (treating i = 1 separately), in the spirit of a mathematical proof by induction. The advantage of this approach is in its much more efficient setup. Instead of 45+1 normalizing flows, we need only three. This efficiency (along with the inductive approach) would be preserved even if we increased the size of Flow-3 to be much larger than Flow-2 and the flows of [28]. However, the downside of our inductive approach is that training Flow-3 cannot be trivially parallelized across multiple GPUs (as the equivalents were in [28]). Also, sharing the same flow across all layers is presumably less expressive than using one flow for each layer."
+    },
+    {
+      "id": 177,
+      "page": 15,
+      "section": "V. CONCLUSIONS",
+      "text": "In both L2LFlows and iCaloFlow, event generation must occur sequentially through each layer. On top of this, the slow sampling from the MAF strongly moti-"
+    },
+    {
+      "id": 178,
+      "page": 16,
+      "section": "V. CONCLUSIONS",
+      "text": "FIG. 15. Histograms of the centers of energy along the x-axis, Cx, for Dataset 2 (left) and Dataset 3 (right). Distributions of Geant4 data are shown as black lines, and those of the iCaloFlow teacher (student) trained on Dataset 2 or 3 (as appropriate) in red (blue). Due to the symmetry of the detector and incident beam, the distributions for the centers of energy in the y direction (Cy) are statistically identical to Cy."
+    },
+    {
+      "id": 179,
+      "page": 16,
+      "section": "V. CONCLUSIONS",
+      "text": "vates the added step of distilling them into student IAF networks. Compared to the teachers, the students speed up event production by a factor of approximately the number of voxels in a layer — though it is still necessary to iterate through all the layers. iCaloFlow is the first work to include a teacher-student pairing in any CaloFlow-like setup for higher dimensional calorimeter shower data such as Datasets 2 and 3."
+    },
+    {
+      "id": 180,
+      "page": 16,
+      "section": "V. CONCLUSIONS",
+      "text": "At this time, no exhaustive comparison with other generative neural networks is possible. The most natural comparison point, the algorithm of [28], is applied to a different data set. During the completion of CaloChallenge2022, iCaloFlow will be compared against other codes, and a more complete understanding of its strengths and weaknesses will be available."
+    },
+    {
+      "id": 181,
+      "page": 16,
+      "section": "V. CONCLUSIONS",
+      "text": "A possible limitation to this inductive algorithm is generalizing it to non-regular calorimeter geometries. In iCaloFlow, Flow-3 requires each layer to be identical in structure, allowing the efficient weight-sharing and training that are the major advantages of the algorithm. Significant modifications would be required to adapt to layer-dependent voxelization. While this might not be possible for arbitrary geometries, some variations (for example, breaking a large voxel in one layer into groups of small voxels in other layers) could admit an inductive flow approach."
+    },
+    {
+      "id": 182,
+      "page": 16,
+      "section": "V. CONCLUSIONS",
+      "text": "Even with these caveats, the efficiency, event generation speed (when using the IAF students), and relatively high fidelity of iCaloFlow make it a competitive architecture for fast calorimeter event generation. One promising future direction is to realize a similar inductive setup based on coupling-layer flows, which are equally fast in density estimation and generation. This would presumably reduce training time as we would not have to train both teacher and student flows."
+    },
+    {
+      "id": 183,
+      "page": 16,
+      "section": "ACKNOWLEDGEMENTS",
+      "text": "We thank Gopolang Mohlabeng for discussion in the early stages of this project. This work was supported by DOE grant DOE-SC0010008. CK would like to thank the Baden-W¨urttemberg-Stiftung for support through the program Internationale Spitzenforschung, project Uncertainties — Teaching AI its Limits (BWST IF2020- 010). In this work, we used the NumPy 1.16.4 [53], Matplotlib 3.1.0 [54], scikit-learn 0.21.2 [55], h5py 2.9.0 [56], pytorch 1.11.1 [57], and nflows 0.14 [58] software packages."
+    },
+    {
+      "id": 184,
+      "page": 16,
+      "section": "Appendix A: Pre- and Postprocessing",
+      "text": "The incident energy is a conditional for all three flows. In all cases, it is transformed from the physical range (1 GeV to 1 TeV) to normalized log-space:"
+    },
+    {
+      "id": 185,
+      "page": 16,
+      "section": "Appendix A: Pre- and Postprocessing",
+      "text": "Einc 104.5 MeV ∈[−1.5, 1.5]. (A1)"
+    },
+    {
+      "id": 186,
+      "page": 16,
+      "section": "Appendix A: Pre- and Postprocessing",
+      "text": "For Flow-1, the total energy deposited in layer i (Ei) is obtained from summing all voxels of the layer. As the flow has difficulty learning a distribution where many elements are exactly zero, uniform noise in the range [0, 5] keV is added to Ei [17]. We then divided by 65 GeV (this is slightly larger than the maximum energy deposition in any layer in any of the events of the dataset):"
+    },
+    {
+      "id": 187,
+      "page": 17,
+      "section": "Appendix A: Pre- and Postprocessing",
+      "text": "Ei →xi ≡(Ei + rand[0, 5 keV])/65 GeV. (A2)"
+    },
+    {
+      "id": 188,
+      "page": 17,
+      "section": "Appendix A: Pre- and Postprocessing",
+      "text": "As a final step, we apply a logit transformation:"
+    },
+    {
+      "id": 189,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "where the offset α ≡10−6 ensures that the boundaries xi = 0 and 1 map to finite numbers."
+    },
+    {
+      "id": 190,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "For both Flow-2 and Flow-3, we apply the same processing steps for the energy depositions per voxel, Iia. First, we add uniform noise in the range [0, 5] keV to every voxel. Then, we normalize the voxel by the sum of all voxels of the given layer and then apply the logit transformation of Eq. (A3) to it:"
+    },
+    {
+      "id": 191,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "Iia →Iia + rand[0, 5 keV] yia = log uia 1 −uia (A4)"
+    },
+    {
+      "id": 192,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "When generating new events from our trained flows, the preprocessing steps are inverted, and normalized showers are transformed back to physical space using the proxy output of Flow-1. Voxel energies below the detector threshold of 15 keV are set to zero."
+    },
+    {
+      "id": 193,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "Flow-2 is conditioned on the energy deposited in the first layer, E1. This is preprocessed as in Eqs. (A2) and (A3), with the additional step of dividing y1 by 4:"
+    },
+    {
+      "id": 194,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "E1 →xi ≡(Ei + rand[0, 5 keV])/65 GeV y1 = 1 4 log u1 1 −u1 (A5)"
+    },
+    {
+      "id": 195,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "This final division by 4 is to bring the range of y1 down to O(1)."
+    },
+    {
+      "id": 196,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "The conditional inputs for Flow-3 are preprocessed as follows: I(i−1)a follows the steps of Eq. (A4). Ei and E(i−1) follow Eqs. (A2) and (A3) (without the factor 4 of Flow-2). The layer number i is one-hot encoded in a vector of length 44."
+    },
+    {
+      "id": 197,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "When sampling new events from iCaloFlow, these transformations are inverted. As a final step, the detector energy threshold is applied on the generated voxel"
+    },
+    {
+      "id": 198,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "[1] O. Br¨uning and L. Rossi, eds., The High Luminosity"
+    },
+    {
+      "id": 199,
+      "page": 17,
+      "section": "yi = log (A3)",
+      "text": "Large Hadron Collider: the new machine for energies by setting all voxels with Iia < 15 keV to zero. As noted previously, when generating new patterns of energy deposition from Flow-2 and Flow-3, the generated ˆIia are not enforced to sum to one. Forcing them to sum to one, as was the choice made in the previous iterations of CaloFlow [17, 18, 26], here causes problems in the voxel energy histograms in Figures 8 and 9. It enhances low-energy voxels above the cut-off threshold, leading to a large excess at the lower end of the voxel energy histograms. This was less of a problem previously, for Dataset 1 and for the CaloGAN dataset, because the normalization was learned better, perhaps because these datasets were lower dimensional. Meanwhile, in L2LFlows [28], which was trained on a dataset comparable in dimensionality to Dataset 2, the voxel energies were normalized by maximum voxel energy in the dataset, so no renormalization with Ei was needed and this issue was avoided. However, we found that normalizing by maximum voxel energy did not improve our results here."
+    },
+    {
+      "id": 200,
+      "page": 17,
+      "section": "Appendix B: Classifier",
+      "text": "The performance metric based on the classifier test uses the neural network architecture that was provided by the CaloChallenge2022 [31, 59] evaluation script. It is based on the classifiers that were used in [17, 18] and was also used (with slightly different hyperparameters) in [26]. To be precise, the classifier is a deep, fullyconnected neural network with an input and two hidden layers with 2048 nodes each. All activation functions are leaky ReLUs, with default negative slope of 0.01, except the output layer, which uses a sigmoid activation function for its single output number. We do not use any regulators such as batch normalization or dropout."
+    },
+    {
+      "id": 201,
+      "page": 17,
+      "section": "Appendix B: Classifier",
+      "text": "The input for low- and high-level feature classification is preprocessed as described in the main text. For Dataset 2, we work with the second provided file of 100k showers [33]. We split it in train/test/validation sets of the ratio (60:20:20). For Dataset 3, we use the third file provided at [34] split in the ratio (40:10) for training and model selection and the full fourth file of [34] to obtain the final scores."
+    },
+    {
+      "id": 202,
+      "page": 17,
+      "section": "Appendix B: Classifier",
+      "text": "All networks are optimized by training 50 epochs with an Adam [48] optimizer with initial learning rate of 2 · 10−4 and a batch size of 1000 (250) for Datasets 2 (3), minimizing the binary cross entropy. We use the model state with the highest accuracy on the validation set for the final evaluation and we subsequently calibrate the classifier using isotonic regression [60] of sklearn [55] based on the validation dataset before evaluating the test set."
+    },
+    {
+      "id": 203,
+      "page": 17,
+      "section": "Appendix B: Classifier",
+      "text": "illuminating the mysteries of Universe, vol. 24, World"
+    },
+    {
+      "id": 204,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Scientific (2015), 10.1142/9581. [2] P. Calafiura, J. Catmore, D. Costanzo and"
+    },
+    {
+      "id": 205,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "A. Di Girolamo, ATLAS HL-LHC Computing Conceptual Design Report, Tech. Rep. CERN-LHCC-2020-015, LHCC-G-178, CERN, Geneva (2020). [3] CMS collaboration, CMS Phase-2 Computing Model:"
+    },
+    {
+      "id": 206,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Update Document, Tech. Rep. , CERN, Geneva (2022). [4] ATLAS collaboration, ATLAS Software and Computing"
+    },
+    {
+      "id": 207,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "HL-LHC Roadmap, Tech. Rep. , CERN, Geneva (2022). [5] HEP Software Foundation collaboration, HL-LHC"
+    },
+    {
+      "id": 208,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Computing Review: Common Tools and Community Software, in 2022 Snowmass Summer Study, P. Canal et al., eds., 8, 2020, DOI [2008.13636]. [6] GEANT4 collaboration, GEANT4–a simulation toolkit,"
+    },
+    {
+      "id": 209,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Nucl. Instrum. Meth. A 506 (2003) 250. [7] J. Allison, K. Amako, J. Apostolakis, H. Araujo,"
+    },
+    {
+      "id": 210,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "P. Arce Dubois, M. Asai et al., Geant4 developments and applications, IEEE Transactions on Nuclear Science 53 (2006) 270. [8] J. Allison, K. Amako, J. Apostolakis, P. Arce, M. Asai,"
+    },
+    {
+      "id": 211,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "T. Aso et al., Recent developments in geant4, Nuclear Instruments and Methods in Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment 835 (2016) 186. [9] M. Paganini, L. de Oliveira and B. Nachman,"
+    },
+    {
+      "id": 212,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Accelerating Science with Generative Adversarial Networks: An Application to 3D Particle Showers in Multilayer Calorimeters, Phys. Rev. Lett. 120 (2018) 042003 [1705.02355]. [10] M. Paganini, L. de Oliveira and B. Nachman,"
+    },
+    {
+      "id": 213,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "CaloGAN: Simulating 3d high energy particle showers in multilayer electromagnetic calorimeters with generative adversarial networks, Physical Review D 97 (2018) . [11] L. de Oliveira, M. Paganini and B. Nachman,"
+    },
+    {
+      "id": 214,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Controlling Physical Attributes in GAN-Accelerated Simulation of Electromagnetic Calorimeters, J. Phys. Conf. Ser. 1085 (2018) 042017 [1711.08813]. [12] M. Erdmann, L. Geiger, J. Glombitza and D. Schmidt,"
+    },
+    {
+      "id": 215,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Generating and refining particle detector simulations using the Wasserstein distance in adversarial networks, Comput. Softw. Big Sci. 2 (2018) 4 [1802.03325]. [13] M. Erdmann, J. Glombitza and T. Quast, Precise simulation of electromagnetic calorimeter showers using a Wasserstein Generative Adversarial Network, Comput. Softw. Big Sci. 3 (2019) 4 [1807.01954]. [14] D. Belayneh et al., Calorimetry with deep learning:"
+    },
+    {
+      "id": 216,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "particle simulation and reconstruction for collider physics, Eur. Phys. J. C 80 (2020) 688 [1912.06794]. [15] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 217,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "G. Kasieczka, A. Korol et al., Getting High: High Fidelity Simulation of High Granularity Calorimeters with High Speed, Comput. Softw. Big Sci. 5 (2021) 13 [2005.05334]. [16] ATLAS Collaboration collaboration, Fast simulation of the ATLAS calorimeter system with Generative Adversarial Networks, Tech. Rep. ATL-SOFT-PUB-2020-006, CERN, Geneva (Nov, 2020). [17] C. Krause and D. Shih, CaloFlow: Fast and Accurate"
+    },
+    {
+      "id": 218,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Generation of Calorimeter Showers with Normalizing Flows, Phys. Rev. D 107 (2023) 113003 [2106.05285]. [18] C. Krause and D. Shih, CaloFlow II: Even Faster and"
+    },
+    {
+      "id": 219,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Still Accurate Generation of Calorimeter Showers with"
+    },
+    {
+      "id": 220,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "Normalizing Flows, Phys. Rev. D 107 (2023) 113004 [2110.11377]. [19] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 221,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "G. Kasieczka, A. Korol et al., Decoding photons: Physics in the latent space of a bib-ae generative network, EPJ Web Conf. 251 (2021) 03003 [2102.12491]. [20] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 222,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "D. Hundhausen, G. Kasieczka et al., Fast and accurate electromagnetic and hadronic showers from generative models, in EPJ Web of Conferences, vol. 251, p. 03049, EDP Sciences, 2021. [21] E. Buhmann, S. Diefenbacher, D. Hundhausen,"
+    },
+    {
+      "id": 223,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "G. Kasieczka, W. Korcari, E. Eren et al., Hadrons, better, faster, stronger, Mach. Learn. Sci. Tech. 3 (2022) 025014 [2112.09709]. [22] ATLAS collaboration, AtlFast3: the next generation of fast simulation in ATLAS, Comput. Softw. Big Sci. 6 (2022) 7 [2109.02551]. [23] V. Mikuni and B. Nachman, Score-based generative models for calorimeter shower simulation, Phys. Rev. D 106 (2022) 092009 [2206.11898]. [24] ATLAS collaboration, Deep generative models for fast photon shower simulation in ATLAS, 2210.06204. [25] A. Adelmann et al., New directions for surrogate models and differentiable programming for High Energy Physics detector simulation, in 2022 Snowmass Summer Study, 3, 2022 [2203.08806]. [26] C. Krause, I. Pang and D. Shih, CaloFlow for"
+    },
+    {
+      "id": 224,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "CaloChallenge Dataset 1, 2210.14245. [27] J.C. Cresswell, B.L. Ross, G. Loaiza-Ganem,"
+    },
+    {
+      "id": 225,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "H. Reyes-Gonzalez, M. Letizia and A.L. Caterini, CaloMan: Fast generation of calorimeter showers with density estimation on learned manifolds, in 36th Conference on Neural Information Processing Systems, 11, 2022 [2211.15380]. [28] S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka,"
+    },
+    {
+      "id": 226,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "C. Krause, I. Shekhzadeh et al., L2LFlows: generating high-fidelity 3D calorimeter images, JINST 18 (2023) P10017 [2302.11594]. [29] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede,"
+    },
+    {
+      "id": 227,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "G. Kasieczka, A. Korol et al., CaloClouds: fast geometry-independent highly-granular calorimeter simulation, JINST 18 (2023) P11025 [2305.04847]. [30] H. Hashemi, N. Hartmann, S. Sharifzadeh, J. Kahn and"
+    },
+    {
+      "id": 228,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "T. Kuhr, Ultra-High-Resolution Detector Simulation with Intra-Event Aware GAN and Self-Supervised Relational Reasoning, 2303.08046. [31] M. Faucci Giannelli, G. Kasieczka, B. Nachman,"
+    },
+    {
+      "id": 229,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "D. Salamani, D. Shih and A. Zaborowska, “Fast calorimeter simulation challenge 2022.” https://calochallenge.github.io/homepage/, 2022. [32] M.F. Giannelli, G. Kasieczka, C. Krause, B. Nachman,"
+    },
+    {
+      "id": 230,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "D. Salamani, D. Shih et al., “Fast calorimeter simulation challenge 2022 - dataset 1.” https://doi.org/10.5281/zenodo.6234054, March, 2022. [33] M.F. Giannelli, G. Kasieczka, C. Krause, B. Nachman,"
+    },
+    {
+      "id": 231,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "D. Salamani, D. Shih et al., “Fast calorimeter simulation challenge 2022 - dataset 2.” https://doi.org/10.5281/zenodo.6366271, March, 2022. [34] M.F. Giannelli, G. Kasieczka, C. Krause, B. Nachman,"
+    },
+    {
+      "id": 232,
+      "page": 18,
+      "section": "Appendix B: Classifier",
+      "text": "D. Salamani, D. Shih et al., “Fast calorimeter simulation challenge 2022 - dataset 3.”"
+    },
+    {
+      "id": 233,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "https://doi.org/10.5281/zenodo.6366324, March, 2022. [35] L. Dinh, D. Krueger and Y. Bengio, NICE: Non-linear"
+    },
+    {
+      "id": 234,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Independent Components Estimation, arXiv e-prints (2014) arXiv:1410.8516 [1410.8516]. [36] L. Dinh, J. Sohl-Dickstein and S. Bengio, Density estimation using Real NVP, arXiv e-prints (2016) arXiv:1605.08803 [1605.08803]. [37] D. Rezende and S. Mohamed, Variational inference with normalizing flows, in International conference on machine learning, pp. 1530–1538, PMLR, 2015. [38] I. Kobyzev, S.J. Prince and M.A. Brubaker,"
+    },
+    {
+      "id": 235,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Normalizing flows: An introduction and review of current methods, IEEE transactions on pattern analysis and machine intelligence 43 (2020) 3964. [39] G. Papamakarios, E.T. Nalisnick, D.J. Rezende,"
+    },
+    {
+      "id": 236,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "S. Mohamed and B. Lakshminarayanan, Normalizing flows for probabilistic modeling and inference., J. Mach. Learn. Res. 22 (2021) 1. [40] H. Abramowicz et al., The International Linear Collider"
+    },
+    {
+      "id": 237,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Technical Design Report - Volume 4: Detectors, 1306.6329. [41] The ILD Concept Group, International Large Detector:"
+    },
+    {
+      "id": 238,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Interim Design Report, 2003.01116. [42] G. Papamakarios, T. Pavlakou and I. Murray, Masked autoregressive flow for density estimation, Advances in neural information processing systems 30 (2017) [1705.07057]. [43] A. van den Oord, Y. Li, I. Babuschkin, K. Simonyan,"
+    },
+    {
+      "id": 239,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "O. Vinyals, K. Kavukcuoglu et al., Parallel WaveNet: Fast high-fidelity speech synthesis, in Proceedings of the 35th International Conference on Machine Learning, J. Dy and A. Krause, eds., vol. 80 of Proceedings of Machine Learning Research, pp. 3918–3926, PMLR, 10–15 Jul, 2018, https://proceedings.mlr.press/v80/oord18a.html. [44] D.P. Kingma, T. Salimans, R. Jozefowicz, X. Chen,"
+    },
+    {
+      "id": 240,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "I. Sutskever and M. Welling, Improved variational inference with inverse autoregressive flow, Advances in neural information processing systems 29 (2016) . [45] A. Zaborowska, private communication, 2022. [46] C. Durkan, A. Bekasov, I. Murray and"
+    },
+    {
+      "id": 241,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "G. Papamakarios, Neural spline flows, Advances in Neural Information Processing Systems 32 (2019) 7511 [1906.04032]. [47] M. Germain, K. Gregor, I. Murray and H. Larochelle,"
+    },
+    {
+      "id": 242,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Made: Masked autoencoder for distribution estimation, in International conference on machine learning, pp. 881–889, PMLR, 2015. [48] D.P. Kingma and J. Ba, Adam: A method for stochastic optimization, 2014. [49] L.N. Smith and N. Topin, Super-convergence: Very fast training of neural networks using large learning rates, in Artificial intelligence and machine learning for multi-domain operations applications, vol. 11006, pp. 369–386, SPIE, 2019. [50] C.-W. Huang, F. Ahmed, K. Kumar, A. Lacoste and"
+    },
+    {
+      "id": 243,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "A. Courville, Probability distillation: A caveat and alternatives, in Proceedings of The 35th Uncertainty in Artificial Intelligence Conference, R.P. Adams and V. Gogate, eds., vol. 115 of Proceedings of Machine Learning Research, pp. 1212–1221, PMLR, 22–25 Jul, 2020, https://proceedings.mlr.press/v115/huang20c.html. [51] D. Lopez-Paz and M. Oquab, Revisiting Classifier"
+    },
+    {
+      "id": 244,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Two-Sample Tests, arXiv e-prints (2016) arXiv:1610.06545 [1610.06545]. [52] S. Diefenbacher, E. Eren, G. Kasieczka, A. Korol,"
+    },
+    {
+      "id": 245,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "B. Nachman and D. Shih, DCTRGAN: Improving the Precision of Generative Models with Reweighting, JINST 15 (2020) P11004 [2009.03796]. [53] C.R. Harris, K.J. Millman, S.J. van der Walt,"
+    },
+    {
+      "id": 246,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "R. Gommers, P. Virtanen, D. Cournapeau et al., Array programming with NumPy, Nature 585 (2020) 357. [54] J.D. Hunter, Matplotlib: A 2d graphics environment,"
+    },
+    {
+      "id": 247,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Computing in Science Engineering 9 (2007) 90. [55] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel,"
+    },
+    {
+      "id": 248,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "B. Thirion, O. Grisel et al., Scikit-learn: Machine learning in Python, Journal of Machine Learning Research 12 (2011) 2825. [56] A. Collette, Python and HDF5, O’Reilly (2013). [57] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury,"
+    },
+    {
+      "id": 249,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "G. Chanan et al., Pytorch: An imperative style, high-performance deep learning library, in Advances in Neural Information Processing Systems 32, H. Wallach, H. Larochelle, A. Beygelzimer, F. Alch´e-Buc, E. Fox and R. Garnett, eds., pp. 8024–8035, Curran Associates, Inc. (2019), http://papers.neurips.cc/paper/9015- pytorch-an-imperative-style-high-performance-deeplearning-library.pdf. [58] C. Durkan, A. Bekasov, I. Murray and"
+    },
+    {
+      "id": 250,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "G. Papamakarios, nflows: normalizing flows in PyTorch, Nov., 2020. 10.5281/zenodo.4296287. [59] M. Faucci Giannelli, G. Kasieczka, B. Nachman,"
+    },
+    {
+      "id": 251,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "D. Salamani, D. Shih and A. Zaborowska, “Fast calorimeter simulation challenge 2022 github page.” https://github.com/CaloChallenge/homepage, 2022. [60] C. Guo, G. Pleiss, Y. Sun and K.Q. Weinberger, On"
+    },
+    {
+      "id": 252,
+      "page": 19,
+      "section": "Appendix B: Classifier",
+      "text": "Calibration of Modern Neural Networks, arXiv e-prints (2017) arXiv:1706.04599 [1706.04599]."
+    }
+  ],
+  "skipped_pages": []
+}

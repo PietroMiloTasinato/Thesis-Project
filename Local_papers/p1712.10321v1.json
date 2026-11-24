@@ -1,0 +1,1220 @@
+{
+  "source": "p1712.10321v1.pdf",
+  "title": null,
+  "num_pages": 14,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "Electromagnetic Calorimeters with Generative Adversarial Networks",
+      "text": "Michela Paganini,1, 2, ∗Luke de Oliveira,2, † and Benjamin Nachman2, ‡"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Electromagnetic Calorimeters with Generative Adversarial Networks",
+      "text": "1Department of Physics, Yale University, New Haven, CT 06520, USA 2Lawrence Berkeley National Laboratory, Berkeley, CA, 94720, USA (Dated: January 1, 2018)"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Electromagnetic Calorimeters with Generative Adversarial Networks",
+      "text": "The precise modeling of subatomic particle interactions and propagation through matter is paramount for the advancement of nuclear and particle physics searches and precision measurements. The most computationally expensive step in the simulation pipeline of a typical experiment at the Large Hadron Collider (LHC) is the detailed modeling of the full complexity of physics processes that govern the motion and evolution of particle showers inside calorimeters. We introduce CaloGAN, a new fast simulation technique based on generative adversarial networks (GANs). We apply these neural networks to the modeling of electromagnetic showers in a longitudinally segmented calorimeter, and achieve speedup factors comparable to or better than existing full simulation techniques on CPU (100×-1000×) and even faster on GPU (up to ∼105×). There are still challenges for achieving precision across the entire phase space, but our solution can reproduce a variety of geometric shower shape properties of photons, positrons and charged pions. This represents a signiﬁcant stepping stone toward a full neural network-based detector simulation that could save signiﬁcant computing time and enable many analyses now and in the future."
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The physics programs of all experiments based at the LHC rely heavily on detailed simulation for all aspects of event reconstruction and data analysis. Simulated particle collisions, decays, and material interactions are used to interpret the results of ongoing experiments and estimate the performance of new ones, including detector upgrades."
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "State-of-the-art simulations are able to precisely model detector geometries and physical processes spanning distance scales as small as 10−20 m for the initial partonparton scattering, all the way to the material interactions at meter length scales. These processes, which include nuclear and atomic interactions, such as ionization, as well as strong, weak, and electromagnetic processes, will alter the state of incoming particles as they propagate through and interact with layers of material in the various detector components. Detection techniques such as calorimetry exploit these physical interactions to detect the presence and measure the energy of particles such as photons, electrons and hadrons via their interactions with hundreds of thousands of detector components. Upon interaction with a calorimeter, a cascade (shower) of secondary particles is produced and their energy is collected and transformed into electric signals."
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Physics-based (full simulation) modeling of particle showers in calorimeters (with Geant4 [1] as the state of the art) is the most computationally demanding part of the whole simulation process, and can take minutes per event on modern, distributed high performance platforms [2, 3]. The production of physics results is often limited by the absence of adequate Monte Carlo (MC) simulation, and the increase in luminosity at the LHC will only exacerbate the problem. For example, the ATLAS and CMS experiments at the high-luminosity phase of the LHC (HL-LHC) will each see about 3 billion top quark pair events [4–10]; for a MC statistical uncertainty that is signiﬁcantly below the data uncertainty, hundreds of billion simulated events would be required. This is not possible using full detector simulation techniques with existing computing resources. Currently, full MC simulation occupies 50-70% of the experiments’ worldwide computing resources, equivalent to billions of CPU hours per year [11–13]."
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The relevance of the calorimeter simulation step has sparked the development of approximate, fast simulation solutions to mitigate its computational complexity. Fast simulation techniques rely on parametrized showers [14– 16] for ﬂuctuations, and look-up tables for low energy interactions [17]. For many applications, these techniques are suﬃcient. However, analyses that utilize the detailed structure of showers for particle identiﬁcation as well as energy and direction calibration may not be able to rely on these simpliﬁed approaches [18]."
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "We introduce a Deep Learning model to enable highﬁdelity fast simulation of particle showers in electromagnetic calorimeters. Previous work [19] assessed the viability of GAN-based simulation of jet-images [20] – sparse, structured, 2D representations of jet fragmentation analogous to a single-layer, idealized calorimeter – and focused on providing architectural guidelines for this regime. Neural network-based generation, including GANs, Variational Auto-Encoders [21], and Adversarial Auto-Encoders [22], have also been tested in other areas of science, such as Cosmology [23, 24], Condensed Matter Physics [25], and Oncology [26]. The longitudinally segmented calorimeter simulation addressed in this work oﬀers unique challenges due to the sparsity of hit cells, the non-uniform granularity among the detector layers, and their sequential structure. In addition to enabling physics analyses at the LHC, the CaloGAN may form a base for solving similar computationally intensive modeling problems in other domains of science, medicine, and technology."
+    },
+    {
+      "id": 9,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "The paper is organized as follows. Section II introduces the dataset of calorimeter showers and Sec. III brieﬂy reviews the generic GAN setup. The CaloGAN is described in Sec. IV and ﬁrst results of its performance are documented in Sec. V. The paper ends with conclusions and future outlook in Sec. VI."
+    },
+    {
+      "id": 10,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "A detector simulation begins with a list of particles with lifetimes greater than O(mm/c). For each particle, we are given its type (e.g. electron, pion, etc.), its energy, and its direction. The particle type determines when and how the particle interacts with the material along its trajectory. Material interactions with the detector factorize [27]: the energy deposited in a calorimeter by various particles is the sum of the energy from each shower treated independently."
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "There are two ﬂavors of calorimeters: electromagnetic and hadronic. Electromagnetic calorimeters are designed to stop electrons and photons, which have shallower and narrower showers compared with protons, neutrons, and charged pions. Hadronic calorimeters are thicker and deeper in order to capture penetrating radiation that forms irregular showers from nuclear interactions. In this ﬁrst application of GANs to a longitudinally segmented calorimeter, we choose to focus only on electromagnetic showers. In addition to already providing the capability to simulate electrons and photons, the electromagnetic shower contains all of the new challenges described in Sec. I."
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "Transverse segmentation is critical for particle identiﬁcation and energy calibration in an electromagnetic calorimeter. For example, the radiation pattern can be used to distinguish prompt photons from π0 →γγ, where the distance between the two photons is O(cm) for a 10 GeV π0 at one meter from the interaction point. Pion rejection and an excellent resolution for photons in the Higgs boson H →γγ discovery channel were driving factors for the design of the ATLAS Liquid Argon (LAr) electromagnetic calorimeter [28], which will serve as an inspiration for the calorimeter used in this study. In particular, the calorimeter used in this study is a cube with size 480 mm3 with no material in front of it. There are three instrumented layers in the radial (z) direction [29] with thicknesses 90 mm, 347 mm, and 43 mm. The active material is LAr and the absorber material is lead. Only the total energy per layer, that includes both the active and inactive contributions is used in what follows."
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "In contrast to the complex accordion geometry in the actual ATLAS calorimeter, our simpliﬁed setup (built on the Geant4 B4 example) uses ﬂat alternating layers of lead and LAr that are 2 mm and 4 mm thick, respectively. Each of the three layers has a diﬀerent segmentation, which is also not square in the ﬁrst and third layers. In particular, the cells in the ﬁrst layer are 160 mm × 5 mm, the cells in the second layer are 40 mm2, and the cells in the third layer are 40 × 80 mm2. The short direction in the ﬁrst layer (η) corresponds to what would be the pp beam direction in a full experiment. In contrast, the short direction in the third layer (φ) is perpendicular to η. Table I summarizes the calorimeter geometry."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "II. DATASET",
+      "text": "The training data set [30] is prepared as follows. Geant4 10.2.0 [1] is used to generate particles and simulate their interaction with our calorimeter using the Ftfp_Bert physics list based on the Fritiof [31–34] and Bertini intra-nuclear cascade [35–37] models with the standard electromagnetic physics package [38]. Positrons, photons, and charged pions with various energies are incident perpendicular on the center of the calorimeter front. Energies in the training are uniform in the range between 1 GeV and 100 GeV. Fig. 1 shows an example 10 GeV electron event with the exact energy deposits from Geant4 (Fig. 1(a)) and after descretizing them according to our calorimeter geometry (Fig. 1(b)). For visualization purposes, a 3-dimensional particle energy signature (Fig. 2) will be displayed in the rest of this paper as a series of three 2D images in η - φ space (Fig. 3), where the pixel intensity represents the sum of the energies of all particles incident to that cell [39]. The ﬁrst layer can be represented as a 3 × 96 image, the middle layer as a 12 × 12 image, and the last layer as a 12 × 6 image."
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "NETWORKS",
+      "text": "Since their ﬁrst formulation [40], Generative Adversarial Networks have become a rapidly increasing area of attention in the Machine Learning literature with many applications in natural image processing. However, there are far fewer applications in basic science and prior to this work, no applications in high energy physics and nuclear physics."
+    },
+    {
+      "id": 16,
+      "page": 2,
+      "section": "NETWORKS",
+      "text": "Generative Adversarial Networks (GANs) cast the task of training a deep generative model as a two-player noncooperative minimax game, in which a generator network G is trained concomitantly with an adversary, the discriminator network D, in order to learn a target distribution f. The generator G learns a map from a latent space z ∼pz(z) (usually chosen to be N(0, 1)) to the space of generated samples, while D learns a map from the sample space to [0, 1], the probability that a shown sample is real. Note that the map that the generator learns implicitly deﬁnes a density g. The game-theoretical basis for this framework [40, 41] ensures that if we extend the space of allowed functions that G and D can draw from to be the space of all continuous functions, then there exists some G (and, by construction, an implicit g) that exactly"
+    },
+    {
+      "id": 17,
+      "page": 3,
+      "section": "NETWORKS",
+      "text": "Layer z length η length φ length [mm] [mm] [mm]"
+    },
+    {
+      "id": 18,
+      "page": 3,
+      "section": "NETWORKS",
+      "text": "TABLE I: Dimension of a calorimeter cell. The z direction is the direction of particle propagation (radial direction in a full experiment), the η direction would be along the pp beam axis in a full experiment, and φ is perpendicular to z and η."
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "NETWORKS",
+      "text": "recovers the target distribution f, i.e., g →f, while for every sample produced by the generator, the discriminator is maximally confused and admits a posterior of being real of 1⁄2. In order to train both G and D, the traditional formulation of GANs [40] utilizes the loss function Ladv shown in Eqn. 1."
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "NETWORKS",
+      "text": "Ladv = Ez∼pz(z)[log(P(D(G(z)) = 0))] term associated with the discriminator perceiving a generated sample as fake"
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "NETWORKS",
+      "text": "EI∼f[log(P(D(I) = 1))] term associated with the discriminator perceiving a real sample as real"
+    },
+    {
+      "id": 22,
+      "page": 3,
+      "section": "NETWORKS",
+      "text": "Though the GAN framework has shown promise, stability is still a major roadblock, and various ad-hoc and theoretical improvements have been suggested, from architectural guidelines [42–46] to reformulations of the loss speciﬁed in Eqn. 1 to move away from the Jensen-Shannon divergence [47–52]. As suggested in [53], we are able to impose task-speciﬁc metrics which allow us to move away from loss level notions of quality and focus on task-level ﬁdelity measures. We make the conscious decision to utilize the vanilla loss formulation as we ﬁnd adequate performance with this version."
+    },
+    {
+      "id": 23,
+      "page": 3,
+      "section": "IV. THE CALOGAN",
+      "text": "Generative Adversarial Networks are explored as a tool to speed up full simulation of particle showers in an EM calorimeter. We identify this solution with the name CaloGAN."
+    },
+    {
+      "id": 24,
+      "page": 3,
+      "section": "IV. THE CALOGAN",
+      "text": "For it to be useful in realistic physics applications, such a system needs to be able to accept requests for the generation of showers originating from an incoming particle of type P at energy E [54]. We introduce an auxiliary task of energy reconstruction to condition on E, a real valued variable. The Auxiliary Classiﬁer GAN [43] formalism is tested to also condition on class P, but ultimately abandoned in favor of training a speciﬁc generative model for each particle type, as the authors expect that versioning and particle-speciﬁc improvements will be prioritized in any practical implementation."
+    },
+    {
+      "id": 25,
+      "page": 3,
+      "section": "IV. THE CALOGAN",
+      "text": "In practice, energy is scaled by a factor of 102 and multiplied to the 1024-dimensional [55] latent space vector z ∈R1024. The generator G then maps this input to three gray-scale image outputs with diﬀerent numbers of pixels, which represent the energy patterns collected by the three calorimeter layers as the requested particle propagates through them. The discriminator D accepts the three images as inputs, along with E, the chosen value for the particle energy. The inputs are mapped to a binary output that classiﬁes showers into real and fake, and a continuous output which calculates the total energy deposited in the three layers, then compares it with the requested energy E."
+    },
+    {
+      "id": 26,
+      "page": 3,
+      "section": "A. Model Architecture",
+      "text": "Given the sparsity levels and high dynamic range in the data described in Section II, we follow the LAGAN guidelines [19] to modify the DCGAN [42] architecture for this speciﬁc regime."
+    },
+    {
+      "id": 27,
+      "page": 3,
+      "section": "A. Model Architecture",
+      "text": "In the generator (shown in Fig. 4), our design combines parallel LAGAN-like processing streams with a trainable attention mechanism that encodes the sequential connection among calorimeter layers. The LAGAN submodules are composed of a 2D convolutional unit followed by two locally-connected units with batch-normalization [56] layers in between. The dimensionality and granularity mismatch among the three longitudinal segmentations of the detector demand separate streams of operations with suitably sized kernels. Towards providing a readily adaptable tool, we provide an architecture construction that is simply a function of the desired output image size, as we seek a common denominator that can be readily applied to a variety of particles in order to obtain reasonable baselines in a quick R&D cycle."
+    },
+    {
+      "id": 28,
+      "page": 3,
+      "section": "A. Model Architecture",
+      "text": "Modelling the sequential nature of the relationship among the energy patterns collected by the three layer requires extra care. Drawing inspiration from [46], we choose an attention mechanism to allow dependence among layers, in which we deﬁne trainable transfer functions to optimally resize and apply knowledge of the energy pattern in previous layers to the generation of the subsequent layer readout. More speciﬁcally, in-painting takes as input a resized image from a previous layer, I"
+    },
+    {
+      "id": 29,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "- Geant4, Pb Absorber, lAr Gap, 10 GeV e"
+    },
+    {
+      "id": 30,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "Depth from Calorimeter Center [mm] 200 150 100 50 0 50 100 150 200"
+    },
+    {
+      "id": 31,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "(a) Each dot represents one energy deposit from Geant4 and the color of the dot encodes the energy. The absorber-gap structure is clearly visible, where most of the energy is lost in the absorber."
+    },
+    {
+      "id": 32,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "- Geant4, Pb Absorber, lAr Gap, 10 GeV e"
+    },
+    {
+      "id": 33,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "Depth from Calorimeter Center [mm] 200 150 100 50 0 50 100 150 200"
+    },
+    {
+      "id": 34,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "(b) Discretized version of (a), in which energy depositions are assigned to individual, discrete detector cells."
+    },
+    {
+      "id": 35,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "FIG. 1: The electromagnetic shower from one 10 GeV electron event. The boundaries of the cells are shown, projecting out the φ segmentation."
+    },
+    {
+      "id": 36,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "and the hypothesized image from the current layer, I, and learns a per-pixel attention weight W via a weighting function ω(I, I"
+    },
+    {
+      "id": 37,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "′) such that the pre-ReLU version of the current layer is W ⊙I + (1 −W) ⊙I"
+    },
+    {
+      "id": 38,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "′, where ⊙is the Hadamard product. This end-to-end trainable unit can utilize information about the two layers to decide what information to propagate through from the previous particle deposition. An alternative architectural choice that includes a recurrent connection will be subject of future studies."
+    },
+    {
+      "id": 39,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "Leaky Rectiﬁed Linear Units [57] are chosen as activation functions throughout the system, with the exception of the output layers of G, in which we prefer Rectiﬁed Linear Units [58] for the creation of sparse samples [19]."
+    },
+    {
+      "id": 40,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "In the discriminator (shown in Fig. 5), the feature space produced by each LAGAN-style output stream is"
+    },
+    {
+      "id": 41,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "FIG. 2: Three-dimensional representation of a 10 GeV e+ incident perpendicular to the center of the detector. Not-to-scale separation among the longitudinal layers is added for visualization purposes."
+    },
+    {
+      "id": 42,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 43,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 44,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 45,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "FIG. 3: Two-dimensional, per-layer representation of the same shower as in Fig. 2."
+    },
+    {
+      "id": 46,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "augmented with a sub-diﬀerentiable version of sparsity percentage [59], as well as minibatch discrimination [48] on both the standard locally connected network-produced features and the output sparsity itself, to ensure a well examined space of sparsities. These are represented in Fig. 5 by the ‘features’ vector."
+    },
+    {
+      "id": 47,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "The discriminator is further customized with domainspeciﬁc features to ensure ﬁdelity of samples. Given the importance of matching the requested energy E, D directly calculates the empirical energy per layer ˆEi, i ∈ {0, 1, 2}, as well as the total energy ˆEtot. Minibatch discrimination is performed on this vector of per-layer energies to ensure a proper distributional understanding. We also add |E−ˆEtot| as a feature, as well as I{|E−ˆ Etot|>ε} with ε = 5 GeV – a binary, sub-diﬀerentiable feature which encodes the tolerance for GAN-produced scatterings to be incorrect in their reconstructed energy."
+    },
+    {
+      "id": 48,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "Further speciﬁcations of the exact hyper-parameter and architectural choices as well as software versioning constraints are available in the source code [60]."
+    },
+    {
+      "id": 49,
+      "page": 4,
+      "section": "A. Model Architecture",
+      "text": "Two additional architectural modiﬁcations were tested in order to build a particle-type conditioning system directly into the learning process. Neither the AC-GAN [43] nor the conditional GAN [44] frameworks were able to handle the substantial diﬀerences among the three particle"
+    },
+    {
+      "id": 50,
+      "page": 5,
+      "section": "A. Model Architecture",
+      "text": "FIG. 4: Composite Generator, illustrating three stream with attentional layer-to-layer dependence."
+    },
+    {
+      "id": 51,
+      "page": 5,
+      "section": "A. Model Architecture",
+      "text": "FIG. 5: Composite Discriminator, depicting additional domain speciﬁc expressions included in the ﬁnal feature space."
+    },
+    {
+      "id": 52,
+      "page": 6,
+      "section": "A. Model Architecture",
+      "text": "types."
+    },
+    {
+      "id": 53,
+      "page": 6,
+      "section": "A. Model Architecture",
+      "text": "We suspect that both a signiﬁcantly richer model and a larger latent space could alleviate some problems associated with conditioning using the investigated approaches. Although building a fully joint model is an interesting Machine Learning challenge, the practicality and ﬂexibility of this application may suﬀer from having one single model for all particle showers."
+    },
+    {
+      "id": 54,
+      "page": 6,
+      "section": "B. Loss Formulation",
+      "text": "In this work, we augment the classical adversarial loss term Ladv (Eqn. 1) – which penalizes the system whenever D fails to classify samples originating from generated or target distributions – with a mean absolute error term:"
+    },
+    {
+      "id": 55,
+      "page": 6,
+      "section": "B. Loss Formulation",
+      "text": "where δ(e, e′) = |e −e′|, E is the requested energy, and"
+    },
+    {
+      "id": 56,
+      "page": 6,
+      "section": "B. Loss Formulation",
+      "text": "ˆE is the reconstructed energy. This allows us to penalize instances of too little or too much deposited energy. This solution not only helps ensuring the conﬁnement of the generated energy to a desirable range, but it also allows to encode a ‘soft’ physical notion of conservation of energy, according to which no more energy than the initial E of the incoming particle can be physically collected by the detector."
+    },
+    {
+      "id": 57,
+      "page": 6,
+      "section": "B. Loss Formulation",
+      "text": "Note, however, that this formulation discourages, but does not forbid, a deposition of more energy than was requested. We can remedy this unphysical result by sampling from a conditional distribution until energy preservation is met. This issue is further addressed in Sec. V B."
+    },
+    {
+      "id": 58,
+      "page": 6,
+      "section": "B. Loss Formulation",
+      "text": "During training, the generator will maximize Eqn. 3, and the discriminator will maximize Eqn. 4."
+    },
+    {
+      "id": 59,
+      "page": 6,
+      "section": "B. Loss Formulation",
+      "text": "Ldiscriminator = λELE + Ladv (4)"
+    },
+    {
+      "id": 60,
+      "page": 6,
+      "section": "C. Training Strategy",
+      "text": "LE is set to 0.05 to down-weight the importance of LE compared to Ladv and rescale the absolute error, which is measured in GeV, to a comparable range with respect to Ladv. This hyper-parameter can be tuned in a systematic way, but with minimal tuning, we were able to ﬁnd a reasonable value."
+    },
+    {
+      "id": 61,
+      "page": 6,
+      "section": "C. Training Strategy",
+      "text": "The weights in the generator and discriminator are optimized in an alternating fashion over a set of 100,000 Geant4-simulated events for each particle type in batches of 256, using the Adam optimizer [61]. The discriminator has a learning rate of 2 × 10−5, and the generator has a learning rate of 2 × 10−4. We note that outside of initial rough hyper-parameter tuning, we perform no dedicated optimization per particle type, and simply apply the same training parameters to all three networks. We expect signiﬁcant performance improvements (especially for pions) with dedicated training."
+    },
+    {
+      "id": 62,
+      "page": 6,
+      "section": "C. Training Strategy",
+      "text": "Each system is trained for 50 epochs. Sixteen NVIDIA K80 graphics cards are used for initial hyper-parameter sweeps, with two Titan X Pascal Architecture cards used for ﬁnal training. Keras v2.0.3 [62] is used to construct all models, with the TensorFlow v1.1.0 backend [63]."
+    },
+    {
+      "id": 63,
+      "page": 6,
+      "section": "V. PERFORMANCE",
+      "text": "As discussed in [53], there exist several methods to qualitatively and quantitatively assess the performance of generative networks, but not all evaluation criteria are equally suitable and reliable for all applications. In this paper, we choose application-driven methods focused on sample quality. A ﬁrst qualitative assessment will be accompanied by a quantitative evaluation based on physics-driven similarity metrics. The choice reﬂects the domain speciﬁc procedure for data-simulation comparison. These similarity metrics are based on one-dimensional statistics of the shower probability distribution. Visualizing and verifying the performance in higher dimensions is a challenge. One way to probe study the modeling of higher dimensions is to study ability to classify showers from diﬀerent particles. This is studied in Sec. V C."
+    },
+    {
+      "id": 64,
+      "page": 6,
+      "section": "A. Qualitative Assessment",
+      "text": "We ﬁrst examine the average calorimeter deposition per voxel (a volumetric pixel). On average, the systems learn a complete picture of the underlying physical processes governing the cascades of e+, γ, and π+ with uniform energy between 1 GeV and 100 GeV (Figs. 6, 7, and 8)."
+    },
+    {
+      "id": 65,
+      "page": 6,
+      "section": "A. Qualitative Assessment",
+      "text": "Diversity and overtraining concerns can be investigated by considering the nearest neighbors among the training and generated datasets. Figs. 9, 10, and 11 shows ﬁve randomly selected events and their GAN-generated nearest neighbors for all three calorimeter layers for e+, γ and π+ showers respectively. Good qualitative agreement can be found between the two distributions across all layers, without obvious signs of mode collapse: a failure mode in which the generator learns to produce a small subset of samples from the distribution. Compared to the other two particle types explored in this application, at the individual image level, charged pions clearly display a higher degree of complexity and diversity in their showers. Some π+ deposit energy in all cells of a given layer, some only hitting a handful of them. This is because charged pions undergo nuclear interactions in addition to electromagnetic interactions."
+    },
+    {
+      "id": 66,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 67,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 68,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 69,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 70,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 71,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 72,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "FIG. 6: Average e+ Geant4 shower (top), and average e+ CaloGAN shower (bottom), with progressive calorimeter depth (left to right)."
+    },
+    {
+      "id": 73,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 74,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 75,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 76,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 77,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 78,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 79,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "FIG. 7: Average γ Geant4 shower (top), and average γ"
+    },
+    {
+      "id": 80,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "CaloGAN shower (bottom), with progressive calorimeter depth (left to right)."
+    },
+    {
+      "id": 81,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 82,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 83,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 84,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 6 7 8 9 10 11 Cell ID"
+    },
+    {
+      "id": 85,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 86,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 87,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "FIG. 8: Average π+ Geant4 shower (top), and average π+ CaloGAN shower (bottom), with progressive calorimeter depth (left to right)."
+    },
+    {
+      "id": 88,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "FIG. 9: Five randomly selected e+ showers per calorimeter layer from the training set (top) and the ﬁve nearest neighbors (by euclidean distance) from a set of"
+    },
+    {
+      "id": 89,
+      "page": 7,
+      "section": "A. Qualitative Assessment",
+      "text": "CaloGAN candidates."
+    },
+    {
+      "id": 90,
+      "page": 7,
+      "section": "B. Shower Shapes",
+      "text": "Electron and photon classiﬁcation and energy calibration use properties of the calorimeter shower [64–67]. These same features can be used to quantitatively assess the quality of the GAN samples. The list of features used for evaluation is provided in Table IV in Appendix A. The key physical quantity that governs the shapes of these distributions is the number of radiation lengths X0 that are traversed by the particle. By deﬁnition, X0 is the distance an electron will travel before its energy is reduced to 1/e on average. The equivalent distance for photons is slightly further (by 9/7 [68]) and is set by the mean free path for pair production. The transverse shower size is also proportional to X0. For a brief review, see e.g. [68]."
+    },
+    {
+      "id": 91,
+      "page": 7,
+      "section": "B. Shower Shapes",
+      "text": "The 1-dimensional distributions for Geant4- and GANgenerated samples are available in Fig. 12. Although the sparsity levels per layer are only roughly matched, note that, for the majority of the remaining variables, the GAN picks up on complex features in the distributions across several orders of magnitude and all particles types. The unique features that pions exhibit, compared to the other particles, make it unfavorable to train a single model for multiple particle types."
+    },
+    {
+      "id": 92,
+      "page": 7,
+      "section": "B. Shower Shapes",
+      "text": "Note that shower shape variables were not explicitly"
+    },
+    {
+      "id": 93,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "FIG. 10: Five randomly selected γ showers per calorimeter layer from the training set (top) and the ﬁve nearest neighbors (by euclidean distance) from a set of"
+    },
+    {
+      "id": 94,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "CaloGAN candidates."
+    },
+    {
+      "id": 95,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "part of the training, which is based only on the distribution of pixel intensities and energy. In the future, one can integrate the shower shape distributions into the lossfunction itself. For now, we have left them out for a comprehensive validation assessment."
+    },
+    {
+      "id": 96,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "In addition to comparing shower shapes to reference distribution, we want to measure the quality of conditioning on energy. As outlined in Sec. IV B, we cannot explicitly impose conservation of energy, but one can devise a simple sampling system to only keep simulated showers that obey this constraint."
+    },
+    {
+      "id": 97,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "As can be noted in the e+ example in Fig. 13, our loss formulation coupled with the uniform training distribution admits an approximately symmetric conditional output energy distribution. In Fig. 13, note that the vertical lines that approximately coincide with the mode of each distribution represent the requested energy, and could easily be used as a threshold on selecting physical events. A noteworthy feature of this system is that one can request energies that lie outside the trained region (capped at 100 GeV in this application), to which a trained CaloGAN will return samples around the requested energy level – though with broader width, and mode shifted towards the training domain. Whether or not these extrapolated samples obey shower shape distributions and other metrics"
+    },
+    {
+      "id": 98,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "FIG. 11: Five randomly selected π+ showers per calorimeter layer from the training set (top) and the ﬁve nearest neighbors (by euclidean distance) from a set of"
+    },
+    {
+      "id": 99,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "CaloGAN candidates."
+    },
+    {
+      "id": 100,
+      "page": 8,
+      "section": "B. Shower Shapes",
+      "text": "is left as future work."
+    },
+    {
+      "id": 101,
+      "page": 8,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "Transferability of classiﬁcation performance from GANgenerated samples to Geant4-generated samples can be used as a proxy both for CaloGAN image quality and potential utility in a practical fast simulation setting."
+    },
+    {
+      "id": 102,
+      "page": 8,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "We perform ten identical trainings of simple six-layer fully-connected e −γ and e −π classiﬁers, and we report the accuracies for in-domain and out-of-domain testing (Table II) along with the following observations:"
+    },
+    {
+      "id": 103,
+      "page": 8,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "• when training on Geant4, testing on the generated CaloGAN data set yields similar results to testing on a separate Geant4 data set, leading us to believe that the GAN has learned most of the discriminating physics between the classes of particles. Note that percent-level diﬀerences in accuracy may however be relevant for particular applications;"
+    },
+    {
+      "id": 104,
+      "page": 8,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "• the signiﬁcantly higher performance obtained on the CaloGAN-generated test set when training on a separate dataset of CaloGAN-generated images highlights a greater inter-class diﬀerentiation in the"
+    },
+    {
+      "id": 105,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "10 2 10 1 100 101 E0 (GeV)"
+    },
+    {
+      "id": 106,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Eratio, 0"
+    },
+    {
+      "id": 107,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Eratio, 1"
+    },
+    {
+      "id": 108,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Sparsity in Layer 0"
+    },
+    {
+      "id": 109,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Sparsity in Layer 1"
+    },
+    {
+      "id": 110,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0 25 50 75 100 125 Etot (GeV)"
+    },
+    {
+      "id": 111,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0 1 2 3 Max Depth d (layer)"
+    },
+    {
+      "id": 112,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Eratio, 2"
+    },
+    {
+      "id": 113,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.5 1.0 1.5 2.0 Shower Depth sd"
+    },
+    {
+      "id": 114,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Sparsity in Layer 2"
+    },
+    {
+      "id": 115,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "0.0 0.2 0.4 0.6 0.8 Shower Depth Width sd"
+    },
+    {
+      "id": 116,
+      "page": 9,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "FIG. 12: Comparison of shower shape variables, introduced in Table IV, and other variables of interest, such as the sparsity level per layer, for the Geant4 and CaloGAN datasets for e+, γ and π+."
+    },
+    {
+      "id": 117,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "70000 1 GeV e +"
+    },
+    {
+      "id": 118,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "25 GeV e +"
+    },
+    {
+      "id": 119,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "50 GeV e +"
+    },
+    {
+      "id": 120,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "100 GeV e +"
+    },
+    {
+      "id": 121,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "150 GeV e +"
+    },
+    {
+      "id": 122,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "1 25 50 100 150 Etot (GeV)"
+    },
+    {
+      "id": 123,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "FIG. 13: Post energy-conditioned empirical energy response for e+ incident at 1, 25, 50, 100, and 150 GeV."
+    },
+    {
+      "id": 124,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "Though our model is only trained on the unform range between 1 and 100 GeV, it still admits a compelling peak at 150 GeV."
+    },
+    {
+      "id": 125,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "GAN synthetic dataset than originally present in the target Geant4 distribution."
+    },
+    {
+      "id": 126,
+      "page": 10,
+      "section": "C. Classiﬁcation as a Performance Proxy",
+      "text": "This could either be due to new unphysical, classdependent features produced by the GAN, or to the inability of the GAN to cover the entire feature space for at least one of the particle classes. It is likely that both of these contribute. To some extent, unphysical features are mitigated by the discriminator network of the GAN training itself, but both physical and unphysical features that are not very useful for distinguishing real from fake could turn into very useful features for the two-particle classiﬁcation case. Such information would therefore appear discriminative in GAN images but not in Geant4. While classiﬁcation is a useful metric for probing the highdimensional feature space and shows promising results, there are still challenges for interpreting and improving upon the outcome."
+    },
+    {
+      "id": 127,
+      "page": 10,
+      "section": "D. Computational Performance",
+      "text": "In addition to the promise of being a high-ﬁdelity fast simulation paradigm and respecting many shower shape variables, the CaloGAN aﬀords many orders of magnitude in computational speedups [69]. We benchmark generation time on e+ with incident energy drawn uniformly between 1 GeV and 100 GeV. Geant4 and CaloGAN on CPU are benchmarked on nearly identical computenodes on the PDSF distributed cluster at the National"
+    },
+    {
+      "id": 128,
+      "page": 10,
+      "section": "D. Computational Performance",
+      "text": "Energy Research Scientiﬁc Computing Center (NERSC), and numerical results are obtained over an average of 100 runs. CaloGAN on GPU hardware is benchmarked on an Amazon Web Service (AWS) p2.8xlarge instance, where a single NVIDIA® K80 is used for the purposes of benchmarking."
+    },
+    {
+      "id": 129,
+      "page": 10,
+      "section": "D. Computational Performance",
+      "text": "In Table III, we show the time-to-generate a single particle shower in milliseconds. We provide diﬀerent batch sizes for CaloGAN, as we expect diﬀerent use-cases will have diﬀerent demands around batching computation. We note that a batch can accept any number of diﬀerent requested energies. With the largest batch sizes on GPU, our method admits a speedup of 5 orders of magnitude compared to the single-threaded Geant4 benchmark. In addition, generation time with Geant4 scales with incident energy, whereas computational time is ﬂat as a function of incident energy for the CaloGAN."
+    },
+    {
+      "id": 130,
+      "page": 10,
+      "section": "D. Computational Performance",
+      "text": "1. Implementation Notes"
+    },
+    {
+      "id": 131,
+      "page": 10,
+      "section": "D. Computational Performance",
+      "text": "As noted previously in Sec. IV A, separating perparticle-type CaloGAN architectures and implementations aﬀords many beneﬁts. It is easy to imagine a situation where the life cycles surrounding models for different particle types are very diﬀerent. In addition, this allows for total independence of versioning, framework, or language."
+    },
+    {
+      "id": 132,
+      "page": 10,
+      "section": "D. Computational Performance",
+      "text": "When possible, any GAN should maximally employ batching – we imagine most applications can request all showers from one event simultaneously, maximally taking advantage of CPU/GPU while minimizing data transfer overhead."
+    },
+    {
+      "id": 133,
+      "page": 10,
+      "section": "VI. CONCLUSIONS AND FUTURE OUTLOOK",
+      "text": "Using modern generative deep neural network techniques, we have generated three-dimensional electromagnetic showers in a multi-layer sampling LAr calorimeter with uneven spatial segmentation, while attempting to preserve spatio-temporal relation among layers. Our approach infused Physics domain knowledge and reproduced many aspects of key shower shape properties comparable to the ones in the Geant4 full simulation. We showed the possibility of up to ﬁve orders of magnitude decrease in computing time."
+    },
+    {
+      "id": 134,
+      "page": 10,
+      "section": "VI. CONCLUSIONS AND FUTURE OUTLOOK",
+      "text": "Future work will focus on improving performance by drawing from the recent Machine Learning developments in GAN training procedures, as well as testing the direct inclusion of important shower shape variables as constraints at training time. Further developments will build on this result and continue expanding the complexity of the training dataset to include incoming particles at different locations and angles within the detector, as well as the hadronic calorimeter. Concurrent plans include contributing to testing the computational performance on high performance computing (HPC) clusters, and porting"
+    },
+    {
+      "id": 135,
+      "page": 11,
+      "section": "VI. CONCLUSIONS AND FUTURE OUTLOOK",
+      "text": "TABLE II: Mean and standard deviation over 10 particle classiﬁcation trials using a six-layer fully-connected network with dropout. The networks are trained using a dataset from the domain speciﬁed in the ﬁrst column, and tested on an independent dataset from the domain speciﬁed in the header."
+    },
+    {
+      "id": 136,
+      "page": 11,
+      "section": "Test on",
+      "text": "Geant4 CaloGAN"
+    },
+    {
+      "id": 137,
+      "page": 11,
+      "section": "Test on",
+      "text": "Geant4 99.6% ± 0.1% 96.5% ± 1.1% Train on"
+    },
+    {
+      "id": 138,
+      "page": 11,
+      "section": "Test on",
+      "text": "CaloGAN 98.2% ± 0.9% 99.9% ± 0.2%"
+    },
+    {
+      "id": 139,
+      "page": 11,
+      "section": "Test on",
+      "text": "Geant4 CaloGAN"
+    },
+    {
+      "id": 140,
+      "page": 11,
+      "section": "Test on",
+      "text": "Geant4 66.1% ± 1.2% 70.6% ± 2.6% Train on"
+    },
+    {
+      "id": 141,
+      "page": 11,
+      "section": "Test on",
+      "text": "CaloGAN 54.3% ± 0.8% 100.0% ± 0.0%"
+    },
+    {
+      "id": 142,
+      "page": 12,
+      "section": "Test on",
+      "text": "TABLE III: Total expected time (in milliseconds) required to generate a single shower under various algorithm-hardware combinations"
+    },
+    {
+      "id": 143,
+      "page": 12,
+      "section": "Test on",
+      "text": "Simulator Hardware Batch Size ms/shower"
+    },
+    {
+      "id": 144,
+      "page": 12,
+      "section": "Test on",
+      "text": "Geant4 CPU N/A 1772"
+    },
+    {
+      "id": 145,
+      "page": 12,
+      "section": "Test on",
+      "text": "128 2.19 CPU"
+    },
+    {
+      "id": 146,
+      "page": 12,
+      "section": "Test on",
+      "text": "CaloGAN"
+    },
+    {
+      "id": 147,
+      "page": 12,
+      "section": "Test on",
+      "text": "GPU"
+    },
+    {
+      "id": 148,
+      "page": 12,
+      "section": "Test on",
+      "text": "[1] GEANT4 Collaboration, Nuclear Instruments and Methods in Physics Research A 506, 250 (2003). [2] G. Aad et al. (ATLAS), Eur. Phys. J. C70, 823 (2010), arXiv:1005.4568 [physics.ins-det]. [3] R. Rahmat, R. Kroeger, and A. Giammanco, Journal of"
+    },
+    {
+      "id": 149,
+      "page": 12,
+      "section": "Test on",
+      "text": "Physics: Conference Series 396, 062016 (2012). [4] M. Czakon and A. Mitov, Comput. Phys. Commun. 185,"
+    },
+    {
+      "id": 150,
+      "page": 12,
+      "section": "Test on",
+      "text": "2930 (2014), arXiv:1112.5675 [hep-ph]. [5] M. Botje et al., (2011), arXiv:1101.0538 [hep-ph]. [6] A. D. Martin, W. J. Stirling, R. S. Thorne, and G. Watt,"
+    },
+    {
+      "id": 151,
+      "page": 12,
+      "section": "Test on",
+      "text": "Eur. Phys. J. C64, 653 (2009), arXiv:0905.3531 [hep-ph]. [7] J. Gao, M. Guzzi, J. Huston, H.-L. Lai, Z. Li, P. Nadolsky,"
+    },
+    {
+      "id": 152,
+      "page": 12,
+      "section": "Test on",
+      "text": "J. Pumplin, D. Stump, and C. P. Yuan, Phys. Rev. D89, 033009 (2014), arXiv:1302.6246 [hep-ph]. [8] R. D. Ball et al., Nucl. Phys. B867, 244 (2013), arXiv:1207.1303 [hep-ph]. [9] V. Khachatryan et al. (CMS), Eur. Phys. J. C77, 172"
+    },
+    {
+      "id": 153,
+      "page": 12,
+      "section": "Test on",
+      "text": "(2017), arXiv:1611.04040 [hep-ex]. [10] M. Aaboud et al. (ATLAS), (2016), arXiv:1612.05220 [hep-ex]. [11] J. Flynn, Computing Resources Scrutiny Group Report,"
+    },
+    {
+      "id": 154,
+      "page": 12,
+      "section": "Test on",
+      "text": "Tech. Rep. CERN-RRB-2015-014 (CERN, Geneva, 2015). [12] E. Karavakis, J. Andreeva, S. Campana, S. Gayazov,"
+    },
+    {
+      "id": 155,
+      "page": 12,
+      "section": "Test on",
+      "text": "S. Jezequel, P. Saiz, L. Sargsyan, J. Schovancova, I. Ueda, and the ATLAS Collaboration, Journal of Physics: Conference Series 513, 062024 (2014). [13] C. Bozzi, LHCb Computing Resource usage in 2014 (II),"
+    },
+    {
+      "id": 156,
+      "page": 12,
+      "section": "Test on",
+      "text": "Tech. Rep. LHCb-PUB-2015-004. CERN-LHCb-PUB- 2015-004 (CERN, Geneva, 2015). [14] G. Grindhammer and S. Peters, in International Conference on Monte Carlo Simulation in High-Energy and Nuclear Physics - MC 93 Tallahassee, Florida, February 22-26, 1993 (1993) arXiv:hep-ex/0001020 [hep-ex]. [15] The ATLAS Collaboration, M. Beckingham, M. Duehrssen, E. Schmidt, M. Shapiro, M. Venturi, J. Virzi, I. Vivarelli, M. Werner, S. Yamamoto, and T. Yamanaka, The simulation principle and performance of the ATLAS fast calorimeter simulation FastCaloSim, Tech. Rep. ATL-PHYS-PUB-2010-013 (CERN, Geneva, 2010)."
+    },
+    {
+      "id": 157,
+      "page": 12,
+      "section": "Test on",
+      "text": "these solutions into the simulation packages used by the nuclear and particle physics communities, in order for the various experiments to be able to maximally beneﬁt from this new technology."
+    },
+    {
+      "id": 158,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "This work was supported in part by the Oﬃce of High Energy Physics of the U.S. Department of Energy under contracts DE-AC02-05CH11231 and DE-FG02- 92ER40704. The authors would like to thank Wahid Bhimji, Zach Marshall, Mustafa Mustafa, and Prabhat, for helpful conversations."
+    },
+    {
+      "id": 159,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[16] G. Grindhammer, M. Rudowicz, and S. Peters, SSC Workshop on Calorimetry for the Superconducting Super"
+    },
+    {
+      "id": 160,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Collider Tuscaloosa, Alabama, March 13-17, 1989, Nucl."
+    },
+    {
+      "id": 161,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Instrum. Meth. A290, 469 (1990). [17] E. Barberio et al., Journal of Physics: Conference Series"
+    },
+    {
+      "id": 162,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "160, 012082 (2009). [18] Performance of the Fast ATLAS Tracking Simulation"
+    },
+    {
+      "id": 163,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(FATRAS) and the ATLAS Fast Calorimeter Simulation (FastCaloSim) with single particles, Tech. Rep. ATL-"
+    },
+    {
+      "id": 164,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "SOFT-PUB-2014-001 (CERN, Geneva, 2014). [19] L. de Oliveira, M. Paganini, and B. Nachman, (2017), arXiv:1701.05927 [stat.ML]. [20] J. Cogan, M. Kagan, E. Strauss, and A. Schwarztman,"
+    },
+    {
+      "id": 165,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "JHEP 02, 118 (2015), arXiv:1407.5675 [hep-ph]. [21] D. P. Kingma and M. Welling, ArXiv e-prints (2013), arXiv:1312.6114 [stat.ML]. [22] A. Makhzani, J. Shlens, N. Jaitly, and I. J. Goodfellow,"
+    },
+    {
+      "id": 166,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "ArXiv e-prints (2015), arXiv:1511.05644 [cs.LG]. [23] S. Ravanbakhsh, F. Lanusse, R. Mandelbaum, J. Schneider, and B. Poczos, (2016), arXiv:1609.05796 [astroph.IM]. [24] K. Schawinski, C. Zhang, H. Zhang, L. Fowler, and G. K."
+    },
+    {
+      "id": 167,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Santhanam, MNRAS 467, L110 (2017), arXiv:1702.00403 [astro-ph.IM]. [25] L. Mosser, O. Dubrule, and M. J. Blunt, ArXiv e-prints"
+    },
+    {
+      "id": 168,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2017), arXiv:1704.03225 [cs.CV]. [26] A. Kadurin, A. Aliper, A. Kazennov, P. Mamoshina,"
+    },
+    {
+      "id": 169,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Q. Vanhaelen, K. Khrabrov, and A. Zhavoronkov, Oncotarget 8 (2016). [27] Energy losses factorize, but detector readout does not."
+    },
+    {
+      "id": 170,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Due to threshold and digitization eﬀects, the energy readout from two energy deposits in diﬀerent detector elements need not be the same as the recorded energy from the two deposits in the same element. In detector simulations, these non-linear eﬀects are treated after accounting for the material interactions and are therefore beyond the scope of the CaloGAN. It may be interesting in future work to consider an end-to-end generator that includes these eﬀects, but it may not save a lot of time since simulation is much more costly than reconstruction."
+    },
+    {
+      "id": 171,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[28] ATLAS liquid-argon calorimeter: Technical Design Report, Technical Design Report ATLAS (CERN, Geneva, 1996). [29] This is the direction that prompt neutral particles at η = 0 would enter the calorimeter without any prior material interactions. [30] B. Nachman, L. de Oliveira, and M. Paganini, “Electromagnetic calorimeter shower images,” (2017), DOI 10.17632/pvn3xc3wy5.1. [31] B. Andersson, G. Gustafson, and B. Nilsson-Almqvist,"
+    },
+    {
+      "id": 172,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Nuclear Physics B 281, 289 (1987). [32] B. Andersson, A. Tai, and B.-H. Sa, Zeitschrift für Physik"
+    },
+    {
+      "id": 173,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "C Particles and Fields 70, 499 (1996). [33] B. Nilsson-Almqvist and E. Stenlund, Comput. Phys."
+    },
+    {
+      "id": 174,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Commun. 43, 387 (1987). [34] B. Ganhuyag and V. Uzhinsky, Relativistic heavy-ion physics. Proceedings, International School/Workshop for Young Physicists, Prague, Czech Republic, September 2-6,"
+    },
+    {
+      "id": 175,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "1996, Czech. J. Phys. 47, 913 (1997). [35] M. P. Guthrie, R. G. Alsmiller, and H. W. Bertini, Nucl."
+    },
+    {
+      "id": 176,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Instrum. Meth. 66, 29 (1968). [36] H. W. Bertini and M. P. Guthrie, Nucl. Phys. A169, 670"
+    },
+    {
+      "id": 177,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(1971). [37] V. A. Karmanov, Nucl. Phys. B166, 378 (1980). [38] H. Burkhardt, V. M. Grichine, P. Gumplinger, V. N."
+    },
+    {
+      "id": 178,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Ivanchenko, R. P. Kokoulin, M. Maire, and L. Urban, in IEEE Symposium Conference Record Nuclear Science 2004., Vol. 3 (2004) pp. 1907–1910 Vol. 3. [39] For the purposes of this study, the cell energy is the sum of the energy deposited in the lead and the argon; in practice, only the LAr energy deposits are measured. Dividing out these two components is left for future work (see Sec. VI). [40] I. J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu,"
+    },
+    {
+      "id": 179,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, ArXiv e-prints (2014), arXiv:1406.2661 [stat.ML]. [41] I. J. Goodfellow, ArXiv e-prints (2014), arXiv:1412.6515"
+    },
+    {
+      "id": 180,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[stat.ML]. [42] A. Radford, L. Metz, and S. Chintala, ArXiv e-prints"
+    },
+    {
+      "id": 181,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2015), arXiv:1511.06434 [cs.LG]. [43] A. Odena, C. Olah, and J. Shlens, ArXiv e-prints (2016), arXiv:1610.09585 [stat.ML]. [44] M. Mirza and S. Osindero, ArXiv e-prints (2014), arXiv:1411.1784 [cs.LG]. [45] X. Chen, Y. Duan, R. Houthooft, J. Schulman, I. Sutskever, and P. Abbeel, ArXiv e-prints (2016), arXiv:1606.03657 [cs.LG]. [46] H. Zhang, T. Xu, H. Li, S. Zhang, X. Huang, X. Wang, and D. Metaxas, ArXiv e-prints (2016), arXiv:1612.03242 [cs.CV]. [47] M. Arjovsky, S. Chintala, and L. Bottou, ArXiv e-prints"
+    },
+    {
+      "id": 182,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2017), arXiv:1701.07875 [stat.ML]. [48] T. Salimans, I. J. Goodfellow, W. Zaremba, V. Cheung, A. Radford, and X. Chen, ArXiv e-prints (2016), arXiv:1606.03498 [cs.LG]. [49] S. Nowozin, B. Cseke, and R. Tomioka, ArXiv e-prints"
+    },
+    {
+      "id": 183,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2016), arXiv:1606.00709 [stat.ML]. [50] G. Qi, ArXiv e-prints (2017), arXiv:1701.06264 [cs.CV]. [51] X. Mao, Q. Li, H. Xie, R. Y. K. Lau, and Z. Wang, ArXiv e-prints (2016), arXiv:1611.04076 [cs.CV]. [52] M. Lin, ArXiv e-prints (2017), arXiv:1704.06191 [cs.LG]."
+    },
+    {
+      "id": 184,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[53] L. Theis, A. van den Oord, and M. Bethge, ArXiv e-prints"
+    },
+    {
+      "id": 185,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2015), arXiv:1511.01844 [stat.ML]. [54] This covers a signiﬁcant portion of the challenge; in practice, the fast simulation must also take the η-φ position of incidence and the incidence angles. We leave this to future work (see Sec. VI). [55] The dimensionality of the latent space is a hyperparameter that need not be the same as the dimensionality of the target space. [56] S. Ioﬀe and C. Szegedy, (2015), arXiv:1502.03167 [cs.LG]. [57] A. L. Maas, A. Y. Hannun, and A. Y. Ng, in in ICML"
+    },
+    {
+      "id": 186,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Workshop on Deep Learning for Audio, Speech and Language Processing (2013). [58] X. Glorot, A. Bordes, and Y. Bengio, Journal of Machine"
+    },
+    {
+      "id": 187,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Learning Research 15 (2011). [59] This is the fraction of hit pixels (occupancy). Subderivatives are a generalization of derivatives to cases with kinks. [60] M. Paganini, L. de Oliveira, and B. Nachman, “heplbdl/calogan: CaloGAN generation, training, and analysis code,” (2017), DOI 10.5281/zenodo.584155. [61] D. P. Kingma and J. Ba, (2014), arXiv:1412.6980 [cs.LG]. [62] F. Chollet, “Keras,” https://github.com/fchollet/ keras (2017). [63] M. Abadi, A. Agarwal, P. Barham, E. Brevdo, Z. Chen,"
+    },
+    {
+      "id": 188,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "C. Citro, G. S. Corrado, A. Davis, J. Dean, M. Devin, S. Ghemawat, I. Goodfellow, A. Harp, G. Irving, M. Isard, Y. Jia, R. Jozefowicz, L. Kaiser, M. Kudlur, J. Levenberg, D. Mané, R. Monga, S. Moore, D. Murray, C. Olah, M. Schuster, J. Shlens, B. Steiner, I. Sutskever, K. Talwar, P. Tucker, V. Vanhoucke, V. Vasudevan, F. Viégas, O. Vinyals, P. Warden, M. Wattenberg, M. Wicke, Y. Yu, and X. Zheng, “TensorFlow: Large-scale machine learning on heterogeneous systems,” (2015), software available from https://www.tensorflow.org/. [64] G. Aad et al. (ATLAS), Eur. Phys. J. C72, 1909 (2012), arXiv:1110.3174 [hep-ex]. [65] G. Aad et al. (ATLAS), Eur. Phys. J. C74, 2941 (2014), arXiv:1404.2240 [hep-ex]. [66] M. Aaboud et al. (ATLAS), Eur. Phys. J. C76, 666 (2016), arXiv:1606.01813 [hep-ex]. [67] M. Aaboud et al. (ATLAS), Eur. Phys. J. C77, 195 (2017), arXiv:1612.01456 [hep-ex]. [68] K. A. Olive et al. (Particle Data Group), Chin. Phys."
+    },
+    {
+      "id": 189,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "C38, 090001 (2014). [69] Note that non-distributed training can take day(s), depending on the total number of training epochs, but it always executes in constant time regardless of the number of showers requested at generation time, so it is a ﬁxed cost that is not relevant for the majority of the total computing budget."
+    },
+    {
+      "id": 190,
+      "page": 13,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Table IV contains the description and mathematical deﬁnition of the shower shape variables used to compare the generated and target distributions. These are deﬁned as functions of Ii, the vector of pixel intensities for an image in layer i, where i ∈{0, 1, 2}."
+    },
+    {
+      "id": 191,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "TABLE IV: One-dimensional observables used to assess the quality of the GAN samples"
+    },
+    {
+      "id": 192,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Shower Shape Variable Formula Notes pixels Ii Energy deposited in the ith layer of calorimeter"
+    },
+    {
+      "id": 193,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Total energy deposited in the electromagnetic calorimeter"
+    },
+    {
+      "id": 194,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Fraction of measured energy deposited in the ith layer of calorimeter"
+    },
+    {
+      "id": 195,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Diﬀerence in energy between the highest and second highest energy deposit in the cells of the ith layer, divided by the sum d = max{i : max(Ii) > 0} Deepest calorimeter layer that registers non-zero energy"
+    },
+    {
+      "id": 196,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Depth-weighted total energy, ld"
+    },
+    {
+      "id": 197,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "The sum of the energy per layer, weighted by layer number"
+    },
+    {
+      "id": 198,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Shower Depth, sd sd = ld/Etot The energy-weighted depth in units of layer number"
+    },
+    {
+      "id": 199,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Shower Depth Width, σsd σsd ="
+    },
+    {
+      "id": 200,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "Etot ith Layer Lateral Width, σi"
+    },
+    {
+      "id": 201,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "2 The standard deviation of sd in units of layer number"
+    },
+    {
+      "id": 202,
+      "page": 14,
+      "section": "Appendix A: Shower Shape Variables",
+      "text": "2 The standard deviation of the transverse energy proﬁle per layer, in units of cell numbers"
+    }
+  ],
+  "skipped_pages": []
+}

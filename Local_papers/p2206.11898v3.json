@@ -1,0 +1,1328 @@
+{
+  "source": "p2206.11898v3.pdf",
+  "title": null,
+  "num_pages": 16,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "Score-based Generative Models for Calorimeter Shower Simulation",
+      "text": "Vinicius Mikuni1, ∗and Benjamin Nachman2, 3, †"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Score-based Generative Models for Calorimeter Shower Simulation",
+      "text": "1National Energy Research Scientiﬁc Computing Center, Berkeley Lab, Berkeley, CA 94720, USA 2Physics Division, Lawrence Berkeley National Laboratory, Berkeley, CA 94720, USA 3Berkeley Institute for Data Science, University of California, Berkeley, CA 94720, USA"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Score-based Generative Models for Calorimeter Shower Simulation",
+      "text": "Score-based generative models are a new class of generative algorithms that have been shown to produce realistic images even in high dimensional spaces, currently surpassing other state-of-the-art models for diﬀerent benchmark categories and applications. In this work we introduce CaloScore, a score-based generative model for collider physics applied to calorimeter shower generation. Three diﬀerent diﬀusion models are investigated using the Fast Calorimeter Simulation Challenge 2022 dataset. CaloScore is the ﬁrst application of a score-based generative model in collider physics and is able to produce high-ﬁdelity calorimeter images for all datasets, providing an alternative paradigm for calorimeter shower simulation."
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Detailed detector simulations are an essential component of data analysis in particle and nuclear physics. These simulations are used to fold particle-level predictions for comparisons with data and are used to unfold data for detector-eﬀects in order to compare with predictions and other experiments. Simulations are also a critical input for the design of future experiments."
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The most widely used detector simulations are built on the program Geant [1–3]. Achieving precision requires signiﬁcant computing time as propagating particles through materials results in a large number of secondary particles each undergoing electromagnetic and/or nuclear interactions. For this reason, the most complex detectors to emulate are calorimeters, whose purpose is to stop particles and measure the deposited energy. An O(1) fraction of all computing in HEP goes towards simulating particle propagation inside dense materials with Geant."
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The experiments at the Large Hadron Collider (LHC) generate billions of events per run, each of which has hundreds to thousands of individual calorimeter showers. Within the experiments’ computing budgets, it is not possible to run Geant-based (‘full’) simulation for all events. Therefore, all of the experiments have developed fast simulation methods that replace physics models with simpler parametric models that are tuned to the full simulation. The fast simulation models are constructed with relatively few parameters in order to facilitate eﬃcient optimization and validation. This fundamentally limits their precision, in particular in the ability to model complex correlations in high-dimensions. These correlations may also not be explicitly part of an optimization that uses only a relatively small number of one-dimensional observables."
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Deep learning oﬀers a complementary approach to engineered parameteric models. Flexible neural networks are used to transform random numbers (called a latent space in machine learning) into structured data. So far, there have been three main strategies for deep generative modeling. Generative adversarial networks (GANs) [4] optimize the generator network by means of an auxiliary network (‘discriminator’) that tries to classify generated examples from real examples. Variational autoencoders (VAEs) [5] learn a stochastic map from the data space to a latent space and back, preserving the statistics of the latent space and data space. Normalizing ﬂows (NFs) [6] use invertible transformations so that the probability density can be computed and the generator is optimized using the log likelihood. A number of deep generative models have been proposed for emulating calorimeter showers and other particle detectors [7–45]."
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The ﬁrst proposals for generating calorimeter showers with deep generative models used GANs (starting with CaloGAN [7–9]). The evaluation of GANs is fast and there are no constraints on the form of the generator function. However, GAN optimization is challenging as it is a minimax problem due to the competition between the generator and discriminator networks. Furthermore, GANs are known to suﬀer from mode collapse where the generator learns to produce only a subset of the possible showers. Despite these challenges, the ATLAS Collaboration become the ﬁrst experiment to replace part of their fast simulation with a GAN [46] and are already using it to generate billions of events for Run 3. Other experiments are also exploring the use of GANs for detector simulation [12, 18, 20]."
+    },
+    {
+      "id": 9,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "Since the ﬁrst GAN studies, there have been a number of innovations to improve the precision of deep generative calorimeter simulation. This includes variations/modiﬁcations to the GAN setup including Wasserstein GANs [20, 47] to help with training stability and mode collapse and reﬁning networks [25, 26] to correct the spectra of an initial generative model. Beyond GANs, recent work with NFs has shown great promise [44, 45]. Normalizing ﬂows tend to be robust to mode collapse and are minimized with a convex loss function. Furthermore, the normalization of the resulting generative model seems to have beneﬁcial regularization properties for the training. The authors of the CaloFlow model [44, 45] showed that a post-hoc classiﬁer struggled to distinguish showers generated from their neural network and showers from Geant 4, a critical milestone in this ﬁeld."
+    },
+    {
+      "id": 10,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "While NFs show great promise for fast calorimeter simulation, they have diﬃculty scaling to higher-dimensional datasets. Such datasets are important for the upgraded CMS forward calorimeter [48] as well as ultra-ﬁne calorimeters proposed for future detectors [49]. Two of the three datasets in the recent Fast Calorimeter Simulation Challenge 2022 [46, 50–52] have dimensionality at least an order of magnitude beyond what has been studied with NFs. The NF training time for these data is prohibitive and would require signiﬁcant research and development."
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "In this paper, we examine the potential of a new class of deep generative algorithms named score-based generative models [53–55]. Like NFs, score-based models minimize a convex loss function with a single generator network that also provides access to the full data likelihood after training (see App. A). However, unlike NFs, the gradient of the data density (the ‘score’) is learned instead of the density. This choice introduces more ﬂexibility to the network architecture, since the Jacobian of the transformation does not need to be computed during training. This additional ﬂexibility, contrary to normalizing ﬂows, also allows the introduction of bottleneck layers (layers with fewer neurons than the previous layer), greatly reducing the number of trainable parameters and improving the scalability of the model. We demonstrate this explicitly on the Fast Calorimeter Simulation Challenge 2022 datasets1. This paper is organized as follows. Sec. II introduces how deep generative models can be constructed using the likelihood gradients instead of likelihoods directly. Different choices of drift and diﬀusion functions investigated in this work are introduced in Sec. III. Section IV describes how new samples are generated from the trained model. Description of the Fast Calorimeter Simulation Challenge 2022 datasets and network architecture are presented in Secs. V and VI as well as a GAN model used for comparison. Finally, numerical results are discussed in Sec VII. The paper ends with conclusions and outlook in Sec. VIII."
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "Our approach most closely follows Ref. [55]. Before providing the technical details, we brieﬂy describe the key method components. First, a neural network is learned to approximate the data score, ∇x log pdata for some high-"
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "1 Scripts used to reproduce the results shown in this document are available at: https://github.com/ViniciusMikuni/CaloScore dimensional distribution x ∈RD described by the probability density pdata. In many high energy physics examples, including calorimeter simulation, we do not have access to pdata analytically - we can only sample from it. Without access to pdata, we cannot use a loss function like the mean squared error to directly approximate (‘match’) the score. NFs circumvent this problem by maximizing the likelihood of the data. There is no analog of maximum likelihood for score matching and so a diﬀerent innovation is required."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "For data that are smeared, it can be shown that matching the score of the smeared data is equivalent to matching the score of the smearing function [56]. For data purposefully smeared by an analytically tractable smearing function (e.g. a Gaussian), this means that all of components required to compute the loss function are known. The methods explored in this paper make use of purposeful smearing, where the amount of smearing is increased/decreased to estimate the density or generate samples, respectively. A schematic of the idea is shown in Fig. 1."
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "A stochastic process that continuously corrupts data is described by the following stochastic diﬀerential equation (SDE):"
+    },
+    {
+      "id": 16,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "The initial data x(t = 0) := x0 ∈Rd sampled from the distribution pdata evolve over time given a set of drift and diﬀusion coeﬃcients f(x, t) : Rd →Rd and g(t) : R →R, respectively. The Wiener process, or Brownian motion, w(t) : R →R is indexed by the time parameter t ∈[0, 1]. The goal of the generative model is to reverse this process, generating new observations starting from a noise distribution and solving the reverse SDE deﬁned as:"
+    },
+    {
+      "id": 17,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "dx = [f(x, t) −g(t)2∇x log pt(x)]dt + g(t)d¯w, (2) where ¯w is the Wiener process in the reverse time direction [57] with the gradient ∇x log pt(x) of the timedependent density pt(x) named the data score. For ﬁxed choices of the drift and diﬀusion coeﬃcients, the only term in Eq. 2 that needs to be estimated is the timedependent score function. However, since the scorefunction is not tractable, we use neural networks that aim to minimize the Frobenius norm of the diﬀerence"
+    },
+    {
+      "id": 18,
+      "page": 2,
+      "section": "II. GENERATIVE MODELS USING GRADIENTS OF THE DATA",
+      "text": "∥sθ(x) −∇x log pdata∥2 with sθ(x) the output of a network with trainable parameters θ. Since the true score function is not known, Eq. 3 cannot be readily computed. Instead, a denoising score matching [56] strategy is used. In this strategy, instead of learning the score function of the data, we aim to learn the score function of data that have been perturbed with a known perturbation function since it is suﬃcient to match the score of the perturbation function. Note that while matching the score of the smeared data requires computing an expectation value over the smeared"
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": "FIG. 1. The score-based generative model is trained using a diﬀusion process that slowly perturbs the data. Generation of new samples is carried out by reversing the diﬀusion process using the learned score-function, or the gradient of the data density. For diﬀerent time-steps, we show the distribution of deposited energies versus generated particle energies (top) and the energy deposition in a single layer of a calorimeter (bottom), generated with our proposed CaloScore model."
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": "data, matching the score of the smearing function requires computing the smeared data and an expectation value over the smeared data."
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": "Given a Gaussian perturbation kernel pσ(˜x|x) := N(x, σ2) and pσ(˜x) := pdata(x)pσ(˜x|x)dx, the probability density of the perturbed data, the loss function minimized during training is:"
+    },
+    {
+      "id": 22,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": "The advantage of this strategy is that we can directly estimate the last term in Eq. 4, since:"
+    },
+    {
+      "id": 23,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": "The time component can be made explicit by rewriting the loss function in Eq. 4 as:"
+    },
+    {
+      "id": 24,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": "(6) The weighting function λ(t) : R ensures the loss function has the same order of magnitude at all times and is chosen to be inversely proportional to E"
+    },
+    {
+      "id": 25,
+      "page": 3,
+      "section": "Reverse-time diffusion (data generation)",
+      "text": ". When the drift coeﬃcient f(x, t) is chosen to be an aﬃne function of x, the resulting perturbation kernel is always Gaussian [58] and can be chosen such that both mean and variance are known in closed form, making Eq. 6 eﬃcient to compute during training."
+    },
+    {
+      "id": 26,
+      "page": 3,
+      "section": "COEFFICIENTS",
+      "text": "In this work we investigate three diﬀerent choices of drift and diﬀusion coeﬃcients that result in perturbation kernels that are easy to calculate in closed form. The ﬁrst SDE, initially proposed in [53], is deﬁned as:"
+    },
+    {
+      "id": 27,
+      "page": 3,
+      "section": "COEFFICIENTS",
+      "text": "is deﬁned with"
+    },
+    {
+      "id": 28,
+      "page": 3,
+      "section": "COEFFICIENTS",
+      "text": "The parameter σ(t) = σmin σmin = 0.01 and σmax = 50 to ensure x(1) ∼N(0, σ2 max) is independent from x(0). Since the time-dependent variance of the resulting perturbation explodes when t →∞, this SDE is often referred to variance exploding (VE) SDE."
+    },
+    {
+      "id": 29,
+      "page": 3,
+      "section": "COEFFICIENTS",
+      "text": "The second SDE is a continuous version of the discrete perturbation introduced in [54], deﬁned as:"
+    },
+    {
+      "id": 30,
+      "page": 4,
+      "section": "COEFFICIENTS",
+      "text": "The parameter β(t) = βmin+t (βmax −βmin) with βmin = 0.1 and βmax = 20 is used, resulting in x(1) ∼N(0, 1). The variance of this process is ﬁxed to one when the initial distribution also has unit variance, hence its is referred to as variance preserving (VP) SDE."
+    },
+    {
+      "id": 31,
+      "page": 4,
+      "section": "COEFFICIENTS",
+      "text": "The last SDE, introduced in [55], is deﬁned as:"
+    },
+    {
+      "id": 32,
+      "page": 4,
+      "section": "COEFFICIENTS",
+      "text": "When the parameter β(t) is chosen to be identical as the one used in Eq. 8, the variance of the stochastic process is always smaller than the variance of the VP SDE, hence receiving the name subVP. Similarly to Eq. 8, x(1) also follows a normal distribution."
+    },
+    {
+      "id": 33,
+      "page": 4,
+      "section": "COEFFICIENTS",
+      "text": "The resulting perturbation kernels induced by each SDE are listed in Tab. I."
+    },
+    {
+      "id": 34,
+      "page": 4,
+      "section": "COEFFICIENTS",
+      "text": "TABLE I. Perturbation kernel induced by diﬀerent SDE choices."
+    },
+    {
+      "id": 35,
+      "page": 4,
+      "section": "COEFFICIENTS",
+      "text": "SDE Perturbation kernel VE N(x(0), σ2(t) −σ2(0)) VP N(x(0)e−1"
+    },
+    {
+      "id": 36,
+      "page": 4,
+      "section": "IV. SAMPLE GENERATION",
+      "text": "New samples are generated by solving the reverse diffusion process deﬁned in Eq. 2 using a numerical SDE solver. In this work, we use the Euler-Maruyama algorithm [59] followed by an additional corrector step that uses the Langevin MCMC approach [60, 61] to increase the sampling quality. For each time decrement ∆t, the updated state of the system is described as:"
+    },
+    {
+      "id": 37,
+      "page": 4,
+      "section": "IV. SAMPLE GENERATION",
+      "text": "(10) where z ∼N(0, 1) is sampled at each time step. The corrector step takes the updated state from Eq. 10 and applies the correction where ϵ is a tunable parameter that determines the strength of the correction applied. A dimensionindependent expression for ϵ is deﬁned as a function of a signal-to-noise ratio r parameter as:"
+    },
+    {
+      "id": 38,
+      "page": 4,
+      "section": "IV. SAMPLE GENERATION",
+      "text": "where ∥z∥2 and ∥sθ∥2 are the batch-average norms of the Gaussian noise and trained score function."
+    },
+    {
+      "id": 39,
+      "page": 4,
+      "section": "IV. SAMPLE GENERATION",
+      "text": "High ﬁdelity samples require the time interval ∆t to be small, possibly leading to hundreds of iterative steps and consequently hundreds of network evaluations. We decrease the number of function evaluations by reusing the score function evaluated in Eq. 10 during the calculation of the corrector step in Eq. 11. This approach eﬀectively decreases the number of function evaluations by a factor two while no decrease in generation quality is observed."
+    },
+    {
+      "id": 40,
+      "page": 4,
+      "section": "CHALLENGE 2022",
+      "text": "CaloScore is trained on the datasets created by the Fast Calorimeter Simulation Challenge 2022 [46, 50– 52]. A total of three datasets are provided, representing calorimeter shower simulations with Geant of diﬀerent geometries and granularities. Dataset 1 [51] is based on the ATLAS open dataset [46, 62] and is similar to the current ATLAS detector calorimeter geometry. Showers are generated at the calorimeter surface in the pseudorapidity range η ∈[0.20, 0.25]. While samples consisting of both photons and pions are provided, we evaluate our model using only the photon dataset. The voxelization procedure is deﬁned such that it minimizes the amount of empty voxels, while maintaining high ﬁdelity compared to the full simulation. This strategy results in diﬀerent number of voxels per calorimeter layer and a total of 368 voxels to represent the full detector slice. Photon energies are provided in this conﬁguration for 15 incident energies from 256 MeV up to 4 TeV in steps given by powers of two. For each generated energy, 10k samples are provided with this number reduced at higher energies due to long simulation times, resulting in a total of 121k used during training."
+    },
+    {
+      "id": 41,
+      "page": 4,
+      "section": "CHALLENGE 2022",
+      "text": "Datasets 2 [52] and 3 [50] contain each 100k examples and are simulated using a common detector layout but with diﬀerent voxelization granularity. The detector simulated has a concentric cylinder geometry with 45 layers, where each layer consists of active (silicon) and passive (tungsten) material, simulated with Geant4. Electrons are generated at the detector surface with initial energy sampled from a log-uniform distribution ranging from 1 GeV to 1 TeV. In dataset 2, each layer consists of 144 readout cells, with 9 in the radial and 16 in the angular directions. Dataset 3 is more granular, consisting of 900 readout cells in each layer, with 18 in the radial and 50 in the angular directions."
+    },
+    {
+      "id": 42,
+      "page": 4,
+      "section": "CHALLENGE 2022",
+      "text": "Even though the initial voxelization is provided in Cylindrical coordinates, we found it beneﬁcial to convert the voxels in datasets 2 and 3 to Cartesian coordinates. This change allows the eﬀective usage of 3D convolutional neural networks (CNNs) to build the score model. While CNNs are applicable in polar coordinates, they struggle to learn periodic boundary conditions. Convolutional operations are also less eﬀective, since the majority of the energy depositions are located near r = 0, or near the corners of the image. Since the datasets are only available after voxelization, the transformation from Cylindrical to Cartesian coordinates inevitably leads to loss of information2. Nevertheless, we observe improved generation quality after changing the coordinate system. See App. B for more details of the transformation. The total number of voxels after the transformation is chosen to be similar to the original number, resulting in 12×12 = 144 and 32 × 32 = 1024 voxels per layer for datasets 2 and 3, respectively."
+    },
+    {
+      "id": 43,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "Energies deposited in each voxel span multiple orders of magnitude, motivating yet another transformation of the inputs before training the generative model. First, each voxel energy Ev is normalized by the value of the generated energy of the particle E0 times a factor f that ensures the normalized voxel energy E′ v = fE0 lies between 0 and 1. Naively, the factor f could be taken as 1, since energy conservation should ensure the sum of deposited energies to not exceed the initial particle’s energy. However, the sampling fraction of the calorimeter may lead to a mismatch between these numbers. This eﬀect is particularly important in dataset 1, when particle energies as low as 256 MeV are considered. We take f as the highest deviation between total deposited and generated energies, ﬁxed to f = 3.1 for dataset 1 and f = 2 for datasets 2 and 3."
+    },
+    {
+      "id": 44,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "The normalized energy depositions are then transformed to log-space, similarly to the strategy used in CaloFlow. The log-transformed value uv is deﬁned as:"
+    },
+    {
+      "id": 45,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "uv = log"
+    },
+    {
+      "id": 46,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "The value α is set to 10−6 and avoids a discontinuity when E′ v = 0. The generated particle energy, used as a conditional input to the model, is also transformed before training. The transformed conditional energy u0 is deﬁned as:"
+    },
+    {
+      "id": 47,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "u0 = e0 −emin emax −emin where emin and emax are the minimum and maximum energies available in the dataset."
+    },
+    {
+      "id": 48,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "Finally, dataset 1 is also modiﬁed by adding an extra dimension that encodes an overall energy normalization. Before applying the log-transformation in Eq. 13, the total deposited energy is calculated. Instead of normalizing each voxel by the generated energy, the total deposited energy is used, ensuring the sum of all voxels is equal to 1. The additional entry is then deﬁned as the total deposited energy normalized by the initial particle energy times the factor f. This strategy improves the estimation of the total energy deposition during training, now encoded as a single entry rather than the sum of all voxels."
+    },
+    {
+      "id": 49,
+      "page": 5,
+      "section": "CHALLENGE 2022",
+      "text": "2 A one-to-one assignment between the two sets of coordinates is possible, but requires the distance interval in Cartesian coordinates to follow a non-linear function since the transformation of coordinates is itself non-linear."
+    },
+    {
+      "id": 50,
+      "page": 5,
+      "section": "DETAILS",
+      "text": "The score function is built from a modiﬁed version of the U-net model [63] where and encoder-decoder architecture with skip connections is used. 3D convolution operations are used as the basic layers in CaloScore for datasets 2 and 3, leveraging the regular geometry. Dataset 1, on the other hand, is irregular and consists of diﬀerent number of voxels per detector layer. In this case the score function is built based on 1D convolutional operations. This approach leads to dataset 1 requiring bigger kernel and layer sizes compared to datasets 2 and 3, resulting in a bigger model architecture. Each convolutional operation uses the swish [64] nonlinear activation function, with a kernel size of 5 (dataset 1) and 3 (datasets 2 and 3). The number of dimensions is reduced in the encoder section of the network through average pooling operations, reducing the total number of dimensions by a factor 4 for dataset 1 and a factor 3 × 2 × 2 = 12 for datasets 2 and 3 after each pooling layer. In the opposite direction, upsampling layers are used to increase the dimensionality by repeating entries multiple times."
+    },
+    {
+      "id": 51,
+      "page": 5,
+      "section": "DETAILS",
+      "text": "The diﬀerent network architectures used for each dataset are shown in Fig. 2."
+    },
+    {
+      "id": 52,
+      "page": 5,
+      "section": "DETAILS",
+      "text": "Conditional inputs used to train the model, namely the time component and generated energy, are ﬁrst transformed using random Fourier features [65]. The transformed features for each conditional input are then concatenated and passed over 2 fully connected layers of sizes 256 (dataset 1) or 128 (datasets 2 and 3), both followed by a swish activation function. This set of conditional embeddings are used during multiple stages of the model architecture. In particular, conditional convolutional operations are created by adding the conditional embeddings as an additional bias at the output of convolutional layers."
+    },
+    {
+      "id": 53,
+      "page": 5,
+      "section": "DETAILS",
+      "text": "Additionally, we train a Wasserstein GAN (WGAN) [66] using an additional gradient penalty (GP) term [67] to enforce the Lipschitz constraint of the critic model. WGAN-GP is a well-established model for calorimeter detector simulation and currently used in the ATLAS Collaboration [46] and studied in the context of diﬀerent detector geometries applied to diﬀerent experimental collaborations [12, 20, 68]."
+    },
+    {
+      "id": 54,
+      "page": 5,
+      "section": "DETAILS",
+      "text": "A similar network architecture to CaloScore is used to facilitate the comparison between approaches. The generator network takes as inputs an uniform distribution with dimensions 50, 100, 150 for datasets 1, 2, and 3 respectively. The noise vector is then concatenated with the conditional energy before passing through a fully connected layer with swish activation function. The output size of the fully connected layer is set to be the same size as last bottleneck layer of the U-Net model used in CaloScore. After reshaping, the same architecture that follows the last bottleneck layer in the right-hand side of the U-net is used. Similarly, the critic"
+    },
+    {
+      "id": 55,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "FIG. 2. Network architectures used for datasets 1 (left), 2 and 3 (right) based on the U-Net architecture. Values in parentheses represent the dimensionality of the data at each layer of the network. Parenthesis after convolutional operations represent the kernel size used. The swish non-linear activation function is used after each convolution operation. Conditional inputs (time and energy) are used multiple times in the model to deﬁne conditional convolution operations described in the middle."
+    },
+    {
+      "id": 56,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "network takes as inputs real or generated samples and uses the same convolutional layers as the ones used in left-hand side of the U-Net model before the last bottleneck layer. From the last bottleneck layer, an additional fully connected layer is used with output size of 1 and no activation function. This choice results in all CaloScore models and WGAN-GP with similar number of trainable weights."
+    },
+    {
+      "id": 57,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "The implementation of all models is carried out with Tensorflow [69] optimized with Adam [70] in the case of CaloScoreand RMSProp in the WGAN-GP implementation, all with initial learning rate set to 10−4. In CaloScore, the learning rate is reduced by a factor 2 if the loss function does not improve for a period of 100 consecutive epochs, evaluated using an independent dataset. The evaluation dataset is taken as 20% of the total amount of available training events. The models are trained for a total of 2000 epochs. The epoch with lowest evaluation loss is saved for further inspection. For all models, 16 NVIDIA A100 GPUs are used simultaneously interfaced with the Horovod package [71] on the Perlmutter supercomputer. The batch size in each GPU is set to 128 (datasets 1 and 2) and 64 (dataset 3). The WGAN-GP model is trained for 10000 epochs with ﬁxed learning rate. The last training epoch is saved for further evaluation, but others epochs before the last were checked to produce similar results as the ones presented."
+    },
+    {
+      "id": 58,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "Sample generation is performed in CaloScoreas described in Sec. IV, with signal-to-noise ratio ﬁxed to 0.2 and total number of time steps set to 100, in dataset 1, and 200, in datasets 2 and 3. See App. C for diﬀerences in generation quality for other parameter choices. The total number of trainable weights and the time required to generate 100 calorimeter showers in a single GPU with batch size ﬁxed to 100 are listed in Tab. II."
+    },
+    {
+      "id": 59,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "TABLE II. Number of dimensions, trainable parameter, and time to generate 100 new calorimeter showers for each dataset studied in this work. Generation times for Geant are based on the average time required to generate samples over the energy range provided."
+    },
+    {
+      "id": 60,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "Dataset N. of N. of Time to 100 showers [s] voxels weights CaloScore WGAN-GP Geant dataset 1 384 32M 4.0 1.3 O(102 −103) dataset 2 6480 1.4M 5.8 1.33 O(104) dataset 3 46080 1.7M 33.4 2.06 O(104)"
+    },
+    {
+      "id": 61,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "The lack of a regular geometry resulted in CaloScore requiring almost 20 times more trainable parameters for dataset 1 compared to datasets 2. On the other hand, dataset 3 has only ∼20% more trainable weights than dataset 2, even though dataset 3 has 7 times more voxels. This observation suggests that the model complexity is mostly determined by the network architecture rather than the number of voxels present in the dataset, contrary to normalizing ﬂows where the complexity from the Jacobian determinant calculation increases at least linearly with the number of voxels."
+    },
+    {
+      "id": 62,
+      "page": 6,
+      "section": "Datasets 2 and 3 Dataset 1",
+      "text": "Although the ultimate goal is for the generation time to be signiﬁcantly faster than for Geant, the time to generate new calorimeter showers with CaloScore is comparatively slow to other machine learning-based models as a result of the hundreds of function evaluations. In this paper, we have focused on modeling the complex data distributions and we leave explorations of accelerating inference to future studies."
+    },
+    {
+      "id": 63,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "Multiple distributions are used to evaluate the quality of generated samples using diﬀerent CaloScore SDE implementations and additional WGAN-GP model. The total energy deposited in the detector and the number of calorimeter hits are shown in Fig. 3. A hit is deﬁned as any voxel with energy deposition above a certain energy threshold. The energy thresholds are taken as the minimum energy observed in each challenge dataset, set to 0.01 keV for dataset 1 and 15.1 keV for datasets 2 and 3. The 1-Wasserstein distance between distributions, referred as the earth mover’s distance (EMD), is also calculated between the Geant and diﬀerent generative model implementations."
+    },
+    {
+      "id": 64,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "A good agreement between the Geant and generated samples is observed for all diﬀusion models and datasets. At low deposited energies, the diﬀerence between CaloScore and Geant increase and is most noticeable for dataset 3. The subVP implementation shows a better agreement overall, followed by VP and VE, indicating that bounding the variance of the diﬀusion process is beneﬁcial, specially as the number of voxels increase. Conversely, the WGAN-GP implementation shows a higher EMD value compared to CaloScore."
+    },
+    {
+      "id": 65,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "A similar conclusion is derived from the average energy deposition as a function of the layer number and Cartesian coordinates x and y shown in Fig. 4."
+    },
+    {
+      "id": 66,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "While the VE implementation agrees with the simulation response in dataset 2, the prediction for dataset 3 is shifted as seen from the layer-dependent distribution. In the case of the WGAN-GP, the predictions are also shifted, but in the opposite direction, predicting a higher energy fraction at the initial layers of the detector."
+    },
+    {
+      "id": 67,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "Similarly, the maximum energy deposited in a single voxel normalized to the total deposited energy is shifted in the VE implementation for dataset 3 as shown in Fig. 5. While the low energy fraction region for dataset 1 is well described by all CaloScore implementations, the high energy fraction region starts to show deviations from the Geant predictions and is best described by the WGAN-GP model. The maximum energy fraction as a function of the layer number for datasets 2 and 3 shows a good agreement between the diﬀerent CaloScore implementations, with most of the distributions showing deviations within the 10% interval."
+    },
+    {
+      "id": 68,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "The angular distribution of the calorimeter shower is investigated in datasets 2 and 3 in terms of the shower width, shown in Fig. 6. The shower width σi with xi, i ∈ [1, 2] representing the x- and y- coordinates is calculated as:"
+    },
+    {
+      "id": 69,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "with energy-weighted mean deﬁned as"
+    },
+    {
+      "id": 70,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "A good agreement between all CaloScore implementations and Geant predictions is observed in dataset 2, with all implementations showing less than 10% deviation in all calorimeter layers. However, for dataset 3, the VP implementations shows a disagreement at the last layers of the detector while the shift observed in Fig. 4 for the VE implementation leads to a similar shift in the shower width. Nevertheless, the subVP implementation maintains the same level of agreement as observed in dataset 2. The WGAN-GP implementation however shows larger ﬂuctuations compared to CaloScoreand consistently smaller shower widths in dataset 3."
+    },
+    {
+      "id": 71,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "A qualitative assessment of the generation is shown in Fig. 7 for datasets 2 and 3. The 2-dimensional distribution of the average energy deposition is shown in the detector layers with highest (layer 10) and lowest (layer 44) mean energy depositions. Empty entries in the Geant simulation are a result of the initial voxelization combined with the following transformation to Cartesian coordinates. All voxels with an expected energy deposition above 0 are populated in all CaloScore and WGAN-GP implementations, an indication that the models are able to reproduce the shower diversity from the training set. Images at layer 10 are identical for all generative models, dominated by the central voxel. Layer 44; however, has more voxels sharing a signiﬁcant fraction of the layer energy. The subVP implementation shows a visually similar average to Geant compared to the other diﬀusion implementations, capturing the high energy depositions along the y-axis in dataset 2 and the isotropic pattern around the center in dataset 3. The WGAN-GP implementation, on the other hand, shows higher energy fractions away from the center of the image, where lower energy fractions are expected."
+    },
+    {
+      "id": 72,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "Finally, the assessment of generated samples using different conditional energies is investigated in Fig. 8, by comparing the total deposited energy versus the generated particle energy."
+    },
+    {
+      "id": 73,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "All CaloScore models show similar mean and spread compared to Geant, with the exception of the VE implementation that shows a wider spread for dataset 2 and higher mean in dataset 3. The WGAN-GP model shows a wider spread in all datasets compared to all CaloScorebesides the VE implementation."
+    },
+    {
+      "id": 74,
+      "page": 7,
+      "section": "VII. RESULTS",
+      "text": "We have also explored the classiﬁer metric introduced in CalowFlow whereby a post-hoc classiﬁer is trained to distinguish generated showers from Geant 4 examples. While the classiﬁer could not perfectly identify fake from real showers, it did have an area under the receiver operating characteristic curve (AUC) of about 0.98 for all three models. The classiﬁer was trained using the generated calorimeter images. While this suggests that further"
+    },
+    {
+      "id": 75,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "CaloScore: VP, EMD :2.63 CaloScore: subVP, EMD :1.52 CaloScore: VE, EMD :1.92 WGAN-GP, EMD :21.55 Geant4"
+    },
+    {
+      "id": 76,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "100 101 102 103 Deposited energy [GeV]"
+    },
+    {
+      "id": 77,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "CaloScore: VP, EMD :6.03 CaloScore: subVP, EMD :2.51 CaloScore: VE, EMD :1.80 WGAN-GP, EMD :5.95 Geant4"
+    },
+    {
+      "id": 78,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "CaloScore: VP, EMD :3.17 CaloScore: subVP, EMD :3.48 CaloScore: VE, EMD :12.56 WGAN-GP, EMD :13.29 Geant4"
+    },
+    {
+      "id": 79,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "100 101 102 103 Deposited energy [GeV]"
+    },
+    {
+      "id": 80,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "CaloScore: VP, EMD :48.32 CaloScore: subVP, EMD :4.76 CaloScore: VE, EMD :11.90 WGAN-GP, EMD :52.44 Geant4"
+    },
+    {
+      "id": 81,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "0 100 200 300 Number of hits"
+    },
+    {
+      "id": 82,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "100 101 102 103 Deposited energy [GeV]"
+    },
+    {
+      "id": 83,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "CaloScore: VP, EMD :59.43 CaloScore: subVP, EMD :27.92 CaloScore: VE, EMD :43.65 WGAN-GP, EMD :249.99 Geant4"
+    },
+    {
+      "id": 84,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "CaloScore: VP, EMD :3102.78 CaloScore: subVP, EMD :252.18 CaloScore: VE, EMD :269.30 WGAN-GP, EMD :1308.43 Geant4"
+    },
+    {
+      "id": 85,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "0 500 1000 1500 2000 2500 3000 Number of hits"
+    },
+    {
+      "id": 86,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "0 2000 4000 6000 8000 10000 Number of hits"
+    },
+    {
+      "id": 87,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "FIG. 3. Comparison of the sum of all voxel energies (top) and number of hits (bottom) for datasets 1 (left), 2 (middle), and 3 (right). Dashed red bands represent the 10% deviation interval of the generated samples when compared to Geant predictions. The earth mover’s distance (EMD) between each distribution and the Geant distribution is also provided."
+    },
+    {
+      "id": 88,
+      "page": 8,
+      "section": "VII. RESULTS",
+      "text": "(hyperparameter)optimization would be beneﬁcial, it already serves as an important baseline for other methods. It should also be noted that compared to the dataset introduced in the CaloGAN paper, the datasets considered in this work are either more realistic (dataset 1) or higher dimensional (a factor 10 for dataset 2 and 100 for dataset 3) and would be interesting to see the classiﬁer metric obtained from models such as CaloFlow."
+    },
+    {
+      "id": 89,
+      "page": 8,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "In this paper we introduced CaloScore, a novel generative model for calorimeter shower simulation based on score-matching, applied for the ﬁrst time in the context of collider physics."
+    },
+    {
+      "id": 90,
+      "page": 8,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "The performance of CaloScore is studied using the Fast Calorimeter Simulation Challenge 2022 datasets and compared to three diﬀerent model implementations based on diﬀerent drift and diﬀusion coeﬃcients. An additional comparison is also provided using a Wasserstein GAN with gradient penalty. This is the ﬁrst method to produce results for all three datasets of the challenge and we look forward to comparisons with other models as they become available."
+    },
+    {
+      "id": 91,
+      "page": 8,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "For lower number of voxels, all models are capable of producing realistic calorimeter showers, showing a good agreement with the Geant simulation in all datasets and for a variety of observables. At the highest dimensional dataset, CaloScore with diﬀusion process described by the subVP stochastic diﬀerential equation is able to produce realistic calorimeter showers while VP and VE SDEs show larger deviations. CaloScorealso shows overall better results compared to the WGAN-GP implementation in all distributions investigated in this work with exception to generation time, where the WGAN-GP implementation is 3-16 times faster than CaloScore. CaloScore is also shown to be scalable, with number of trainable parameters sensitive to the overall model architecture rather than the total dimensionality of the dataset."
+    },
+    {
+      "id": 92,
+      "page": 8,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "While the voxelization strategy used in dataset 1 minimizes the number of empty voxels, the irregular voxelization reduces the geometrical information present in the calorimeter shower. The geometrical information is included as an important inductive bias for datasets 2 and 3 and leads to an order of magnitude fewer trainable parameters in the model compared to the one used in dataset 1. Moreover, a regular voxelization amenable to convolutional operations is obtained in datasets 2 and 3 only after an additional transformation of coordinates. Since the transformation is applied on the voxelized in-"
+    },
+    {
+      "id": 93,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.50 CaloScore: subVP, EMD :0.21 CaloScore: VE, EMD :0.15 WGAN-GP, EMD :1.23 Geant4"
+    },
+    {
+      "id": 94,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.50 CaloScore: subVP, EMD :0.21 CaloScore: VE, EMD :0.16 WGAN-GP, EMD :0.24 Geant4"
+    },
+    {
+      "id": 95,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 2 4 6 8 10 x-bin"
+    },
+    {
+      "id": 96,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.13 CaloScore: subVP, EMD :0.14 CaloScore: VE, EMD :0.09 WGAN-GP, EMD :0.31 Geant4"
+    },
+    {
+      "id": 97,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 2 4 6 8 10 y-bin"
+    },
+    {
+      "id": 98,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.09 CaloScore: subVP, EMD :0.06 CaloScore: VE, EMD :0.05 WGAN-GP, EMD :0.27 Geant4"
+    },
+    {
+      "id": 99,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 5 10 15 20 25 30 x-bin"
+    },
+    {
+      "id": 100,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 101,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.09 CaloScore: subVP, EMD :0.07 CaloScore: VE, EMD :0.05 WGAN-GP, EMD :0.29 Geant4"
+    },
+    {
+      "id": 102,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.09 CaloScore: subVP, EMD :0.07 CaloScore: VE, EMD :0.13 WGAN-GP, EMD :0.24 Geant4"
+    },
+    {
+      "id": 103,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 5 10 15 20 25 30 y-bin"
+    },
+    {
+      "id": 104,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 105,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "FIG. 4. Comparison of the average deposited energies in the x- (left), y- (middle), and z-coordinates (right) for datasets 2 (top) and 3 (bottom). Dashed red bands represent the 10% deviation interval of the generated samples when compared to Geant predictions. The earth mover’s distance (EMD) between each distribution and the Geant distribution is also provided."
+    },
+    {
+      "id": 106,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.01 CaloScore: subVP, EMD :0.01 CaloScore: VE, EMD :0.01 WGAN-GP, EMD :0.01 Geant4"
+    },
+    {
+      "id": 107,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy"
+    },
+    {
+      "id": 108,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.01 CaloScore: subVP, EMD :0.01 CaloScore: VE, EMD :0.02 WGAN-GP, EMD :0.03 Geant4"
+    },
+    {
+      "id": 109,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.02 CaloScore: subVP, EMD :0.01 CaloScore: VE, EMD :0.02 WGAN-GP, EMD :0.02 Geant4"
+    },
+    {
+      "id": 110,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 111,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 112,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "FIG. 5. Comparison of the maximum deposited energy in a single voxel divided by the sum of deposited energies in datasets 1 (left), 2 (middle), and 3 (right). Dashed red bands represent the 10% deviation interval of the generated samples when compared to Geant predictions. The earth mover’s distance (EMD) between each distribution and the Geant distribution is also provided."
+    },
+    {
+      "id": 113,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "puts, nonphysical artifacts are introduced, such as empty voxels in regions that are not expected to be empty. All of these issues could be addressed if alternative voxelization schemes were available or if access to the datasets prior to any voxelization was possible."
+    },
+    {
+      "id": 114,
+      "page": 9,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "The addition of inductive biases to the model is also expected to improve the generation capabilities of CaloScore, possibly leading to better and even smaller model architectures. Energy conservation in particular is challenging to enforce, since generated samples are not produced during training time, but only at generation time when the reverse stochastic diﬀerential equation is"
+    },
+    {
+      "id": 115,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.00 CaloScore: subVP, EMD :0.00 CaloScore: VE, EMD :0.00 WGAN-GP, EMD :0.01 Geant4"
+    },
+    {
+      "id": 116,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.00 CaloScore: subVP, EMD :0.00 CaloScore: VE, EMD :0.00 WGAN-GP, EMD :0.01 Geant4"
+    },
+    {
+      "id": 117,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 118,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 119,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.02 CaloScore: subVP, EMD :0.01 CaloScore: VE, EMD :0.01 WGAN-GP, EMD :0.02 Geant4"
+    },
+    {
+      "id": 120,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "CaloScore: VP, EMD :0.03 CaloScore: subVP, EMD :0.01 CaloScore: VE, EMD :0.01 WGAN-GP, EMD :0.01 Geant4"
+    },
+    {
+      "id": 121,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 122,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 123,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "FIG. 6. Comparison of the particle shower width in the x- and y- directions in datasets 2 (ﬁrst two ﬁgures from the left) and 3 (last two ﬁgures from the left). Dashed red bands represent the 10% deviation interval of the generated samples when compared to Geant predictions. The earth mover’s distance (EMD) between each distribution and the Geant distribution is also provided."
+    },
+    {
+      "id": 124,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 125,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 126,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 127,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 128,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 129,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 130,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 131,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 132,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 133,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "0.0 2.5 5.0 7.5 10.0 x-bin"
+    },
+    {
+      "id": 134,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "FIG. 7. The 2-dimensional distribution of the mean deposited energy in layers with highest (ﬁrst and third rows) and lowest (second and fourth rows) mean energy depositions in datasets 2 (ﬁrst two rows) and 3 (last two rows). Simulated samples from Geant are shown in the ﬁrst column, compared with diﬀerent diﬀusion models: VP (second column), subVP(third column), and VE (fourth column). The WGAN-GP results are shown in the fourth column."
+    },
+    {
+      "id": 135,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "solved. We partially address this issue by increasing the dimensionality of dataset 1, introducing an additional entry that stores an overall normalization. Since datasets 2 and 3 rely on the geometrical description of the voxels, this strategy is not readily applicable and would instead beneﬁt from a two-step approach as used in CaloFlow, where the overall normalization is determined separately and used as a conditional input to a second model that learns the normalized detector response."
+    },
+    {
+      "id": 136,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "The major challenge to be addressed in CaloScore is the generation time, currently requiring hundreds of model evaluations to solve the reverse SDE. While the total generation time of CaloScore is still faster compared to the Geant simulation, we envision future works targeting high ﬁdelity generation with lower number of function evaluations. Indeed, since this limitation is also observed in applications of diﬀusion models in general, a number of diﬀerent attempts are currently being proposed to accelerate the generation procedure [72–76], with feasibility for collider physics applications yet to be studied."
+    },
+    {
+      "id": 137,
+      "page": 10,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "Finally, CaloScore introduces a new generative paradigm to collider physics with scalable training strategy and able to generate realistic calorimeter showers"
+    },
+    {
+      "id": 138,
+      "page": 11,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "FIG. 8. Deposited energy versus generated energy in CaloScore (blue) and Geant (orange) for the three diﬀerent diﬀusion models: VP (ﬁrst column), subVP(second column), and VE (third column). WGAN-GP results are shown in the fourth column. First row samples are generated using energies from dataset 1, second row from dataset 2 and third row from dataset 3."
+    },
+    {
+      "id": 139,
+      "page": 11,
+      "section": "VIII. CONCLUSIONS AND OUTLOOK",
+      "text": "consisting of tens of thousands of dimensions. While the generation time represents the main challenge to be overcome, CaloScore is able to incorporate diﬀerent advantages from other generative models while addressing some of their limitations. These include scalable and stable training schedule, based on the minimization of the convex score-matching loss, and exact likelihood estimation, previously only available with methods such as normalizing ﬂows."
+    },
+    {
+      "id": 140,
+      "page": 11,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "We thank Jean-Roch Vlimant, David Shih, and Daniel Britzger for feedback on the manuscript. VM and BN"
+    },
+    {
+      "id": 141,
+      "page": 11,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[1] S. Agostinelli et al., Nuclear Instruments and Methods in"
+    },
+    {
+      "id": 142,
+      "page": 11,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment 506, 250 (2003). [2] J. Allison, K. Amako, J. Apostolakis, H. Araujo, P. Arce Dubois, M. Asai, G. Barrand, R. Capra, S. Chauvie, R. Chytracek, G. Cirrone, G. Cooperman, G. Cosmo, G. Cuttone, G. Daquino, M. Donszelmann, M. Dressel, G. Folger, F. Foppiano, J. Generowicz, V. Grichine, S. Guatelli, P. Gumplinger, A. Heikkinen, I. Hrivnacova, A. Howard, S. Incerti, V. Ivanchenko, T. Johnson, F. Jones, T. Koi, R. Kokoulin, M. Kossov, H. Kurashige, are supported by the U.S. Department of Energy (DOE), Oﬃce of Science under contract DE-AC02-05CH11231. The work of DS was supported by DOE grant DOE- SC0010008. This research used resources of the National Energy Research Scientiﬁc Computing Center, a DOE Oﬃce of Science User Facility supported by the Oﬃce of Science of the U.S. Department of Energy under Contract No. DE-AC02-05CH11231 using NERSC award HEP- ERCAP0021099."
+    },
+    {
+      "id": 143,
+      "page": 11,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "V. Lara, S. Larsson, F. Lei, O. Link, F. Longo, M. Maire, A. Mantero, B. Mascialino, I. McLaren, P. Mendez Lorenzo, K. Minamimoto, K. Murakami, P. Nieminen, L. Pandola, S. Parlati, L. Peralta, J. Perl, A. Pfeiﬀer, M. Pia, A. Ribon, P. Rodrigues, G. Russo, S. Sadilov, G. Santin, T. Sasaki, D. Smith, N. Starkov, S. Tanaka, E. Tcherniaev, B. Tome, A. Trindade, P. Truscott, L. Urban, M. Verderi, A. Walkden, J. Wellisch, D. Williams, D. Wright, and H. Yoshida, IEEE Transactions on Nuclear Science 53, 270 (2006)."
+    },
+    {
+      "id": 144,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[3] J. Allison, K. Amako, J. Apostolakis, P. Arce, M. Asai,"
+    },
+    {
+      "id": 145,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "T. Aso, E. Bagli, A. Bagulya, S. Banerjee, G. Barrand, B. Beck, A. Bogdanov, D. Brandt, J. Brown, H. Burkhardt, P. Canal, D. Cano-Ott, S. Chauvie, K. Cho, G. Cirrone, G. Cooperman, M. Cort´es-Giraldo, G. Cosmo, G. Cuttone, G. Depaola, L. Desorgher, X. Dong, A. Dotti, V. Elvira, G. Folger, Z. Francis, A. Galoyan, L. Garnier, M. Gayer, K. Genser, V. Grichine, S. Guatelli, P. Gu`eye, P. Gumplinger, A. Howard, I. Hˇrivn´aˇcov´a, S. Hwang, S. Incerti, A. Ivanchenko, V. Ivanchenko, F. Jones, S. Jun, P. Kaitaniemi, N. Karakatsanis, M. Karamitros, M. Kelsey, A. Kimura, T. Koi, H. Kurashige, A. Lechner, S. Lee, F. Longo, M. Maire, D. Mancusi, A. Mantero, E. Mendoza, B. Morgan, K. Murakami, T. Nikitina, L. Pandola, P. Paprocki, J. Perl, I. Petrovi´c, M. Pia, W. Pokorski, J. Quesada, M. Raine, M. Reis, A. Ribon, A. Risti´c Fira, F. Romano, G. Russo, G. Santin, T. Sasaki, D. Sawkey, J. Shin, I. Strakovsky, A. Taborda, S. Tanaka, B. Tom´e, T. Toshito, H. Tran, P. Truscott, L. Urban, V. Uzhinsky, J. Verbeke, M. Verderi, B. Wendt, H. Wenzel, D. Wright, D. Wright, T. Yamashita, J. Yarba, and H. Yoshida, Nuclear Instruments and Methods in Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment 835, 186 (2016). [4] I. J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu,"
+    },
+    {
+      "id": 146,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio, (2014), arXiv:1406.2661 [stat.ML]. [5] D. P. Kingma and M. Welling, (2014), arXiv:1312.6114"
+    },
+    {
+      "id": 147,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[stat.ML]. [6] D. Rezende and S. Mohamed, Proceedings of the 32nd"
+    },
+    {
+      "id": 148,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "International Conference on Machine Learning 37, 1530 (2015). [7] L. de Oliveira, M. Paganini, and B. Nachman, (2017),"
+    },
+    {
+      "id": 149,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "10.1007/s41781-017-0004-6, arXiv:1701.05927 [stat.ML]. [8] M. Paganini, L. de Oliveira, and B. Nachman, Phys. Rev."
+    },
+    {
+      "id": 150,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Lett. 120, 042003 (2018), arXiv:1705.02355 [hep-ex]. [9] M. Paganini, L. de Oliveira, and B. Nachman, Phys. Rev. D97, 014021 (2018), arXiv:1712.10321 [hep-ex]. [10] S. Vallecorsa, F. Carminati, and G. Khattak, Proceedings, 23rd International Conference on Computing in High Energy and Nuclear Physics (CHEP 2018): Soﬁa, Bulgaria, July 9-13, 2018 214, 02010 (2019). [11] C. Ahdida et al. (SHiP), (2019), 10.1088/1748- 0221/14/11/P11028, arXiv:1909.04451 [physics.ins-det]. [12] V. Chekalina, E. Orlova, F. Ratnikov, D. Ulyanov,"
+    },
+    {
+      "id": 151,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "A. Ustyuzhanin, and E. Zakharov, CHEP 2018 (2018), 10.1051/epjconf/201921402034, arXiv:1812.01319 [physics.data-an]. [13] ATL-SOFT-PUB-2018-001 (2018). [14] F. Carminati, A. Gheata, G. Khattak, P. Mendez Lorenzo, S. Sharan, and S. Vallecorsa, Proceedings, 18th International Workshop on Advanced Computing and Analysis Techniques in Physics Research (ACAT 2017): Seattle, WA, USA, August 21-25, 2017 1085, 032016 (2018). [15] S. Vallecorsa, Proceedings, 18th International Workshop on Advanced Computing and Analysis Techniques in Physics Research (ACAT 2017): Seattle, WA, USA, August 21-25, 2017 1085, 022005 (2018). [16] P. Musella and F. Pandolﬁ, Comput. Softw. Big Sci. 2, 8"
+    },
+    {
+      "id": 152,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2018), arXiv:1805.00850 [hep-ex]. [17] M. Erdmann, L. Geiger, J. Glombitza, and D. Schmidt,"
+    },
+    {
+      "id": 153,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Comput. Softw. Big Sci. 2, 4 (2018), arXiv:1802.03325"
+    },
+    {
+      "id": 154,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[astro-ph.IM]. [18] K. Deja, T. Trzcinski, and u. Graczykowski, Proceedings,"
+    },
+    {
+      "id": 155,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "23rd International Conference on Computing in High Energy and Nuclear Physics (CHEP 2018): Soﬁa, Bulgaria, July 9-13, 2018 214, 06003 (2019). [19] D. Derkach, N. Kazeev, F. Ratnikov, A. Ustyuzhanin, and A. Volokhova, (2019), 10.1016/j.nima.2019.01.031, arXiv:1903.11788 [hep-ex]. [20] M. Erdmann, J. Glombitza, and T. Quast, Comput. Softw. Big Sci. 3, 4 (2019), arXiv:1807.01954 [physics.insdet]. [21] L. de Oliveira, M. Paganini, and B. Nachman (2017). [22] L. de Oliveira, M. Paganini, and B. Nachman, J. Phys."
+    },
+    {
+      "id": 156,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Conf. Ser. 1085, 042017 (2018), arXiv:1711.08813 [hepex]. [23] B. Hooberman, A. Farbin, G. Khattak, V. Pacela,"
+    },
+    {
+      "id": 157,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "M. Pierini, J.-R. Vlimant, M. Spiropulu, W. Wei, M. Zhang, and S. Vallecorsa (2017). [24] D. Belayneh et al., (2019), 10.1140/epjc/s10052-020- 8251-9, arXiv:1912.06794 [physics.ins-det]. [25] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol, and K. Kruger, (2020), arXiv:2005.05334 [physics.ins-det]. [26] S. Diefenbacher, E. Eren, G. Kasieczka, A. Korol, B. Nachman, and D. Shih, Journal of Instrumentation 15, P11004 (2020), arXiv:2009.03796 [hep-ph]. [27] R. Kansal, J. Duarte, B. Orzari, T. Tomei, M. Pierini,"
+    },
+    {
+      "id": 158,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "M. Touranakou, J.-R. Vlimant, and D. Gunopoulos, 34th Conference on Neural Information Processing Systems (2020), arXiv:2012.00173 [physics.data-an]. [28] A. Maevskiy, F. Ratnikov, A. Zinchenko, and V. Riabov,"
+    },
+    {
+      "id": 159,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2020), arXiv:2012.04595 [physics.ins-det]. [29] F. Rehm, S. Vallecorsa, V. Saletore, H. Pabst, A. Chaibi, V. Codreanu, K. Borras, and D. Kr¨ucker, (2021), 10.5220/0010245002510258, arXiv:2103.10142 [physics.data-an]. [30] F. Rehm, S. Vallecorsa, K. Borras, and D. Kr¨ucker (2021) arXiv:2103.13698 [hep-ex]. [31] F. Rehm, S. Vallecorsa, K. Borras, and D. Kr¨ucker (2021) arXiv:2105.08960 [hep-ex]. [32] R. Kansal, J. Duarte, H. Su, B. Orzari, T. Tomei,"
+    },
+    {
+      "id": 160,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "M. Pierini, M. Touranakou, J.-R. Vlimant, and D. Gunopulos, (2021), arXiv:2106.11535 [cs.LG]. [33] G. R. Khattak, S. Vallecorsa, F. Carminati, and G. M."
+    },
+    {
+      "id": 161,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Khan, (2021), arXiv:2109.07388 [physics.ins-det]. [34] L. Anderlini (2021) arXiv:2110.07925 [hep-ex]. [35] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, D. Hundhausen, G. Kasieczka, W. Korcari, K. Kr¨uger, P. McKeown, and L. Rustige, (2021), arXiv:2112.09709 [physics.ins-det]. [36] S. Bieringer, A. Butter, S. Diefenbacher, E. Eren, F. Gaede, D. Hundhausen, G. Kasieczka, B. Nachman, T. Plehn, and M. Trabs, (2022), arXiv:2202.07352 [hepph]. [37] J. W. Monk, (2018), arXiv:1807.03685 [hep-ph]. [38] K. Dohi, (2020), arXiv:2009.04842 [hep-ph]. [39] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol, and K. Kr¨uger, (2021), arXiv:2102.12491 [physics.ins-det]. [40] A. Hariri, D. Dyachkova, and S. Gleyzer, (2021), arXiv:2104.01725 [hep-ex]. [41] C. Fanelli and J. Pomponi, Mach. Learn. Sci. Tech. 1,"
+    },
+    {
+      "id": 162,
+      "page": 12,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "015010 (2019), arXiv:1911.11717 [physics.data-an]."
+    },
+    {
+      "id": 163,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[42] B. Orzari, T. Tomei, M. Pierini, M. Touranakou, J. Duarte, R. Kansal, J.-R. Vlimant, and D. Gunopulos, in 38th International Conference on Machine Learning Conference (2021) arXiv:2109.15197 [physics.data-an]. [43] M. Touranakou, N. Chernyavskaya, J. Duarte, D. Gunopulos, R. Kansal, B. Orzari, M. Pierini, T. Tomei, and J.-R. Vlimant, (2022), arXiv:2203.00520 [physics.compph]. [44] C. Krause and D. Shih, (2021), arXiv:2106.05285 [physics.ins-det]. [45] C. Krause and D. Shih, (2021), arXiv:2110.11377 [physics.ins-det]. [46] G. Aad et al. (ATLAS), Comput. Softw. Big Sci. 6, 7"
+    },
+    {
+      "id": 164,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2022), arXiv:2109.02551 [hep-ex]. [47] M. Arjovsky, S. Chintala, and L. Bottou, “Wasserstein gan,” (2017). [48] The Phase-2 Upgrade of the CMS Endcap Calorimeter,"
+    },
+    {
+      "id": 165,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Tech. Rep. (CERN, Geneva, 2017). [49] J. Repond et al. (CALICE), JINST 13, P12022 (2018), arXiv:1809.03909 [physics.ins-det]. [50] M. Faucci Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska, “Fast Calorimeter Simulation Challenge 2022 - Dataset 3,” (2022). [51] M. F. Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska, “Fast Calorimeter Simulation Challenge 2022 - Dataset 1,” (2022). [52] M. Faucci Giannelli, G. Kasieczka, C. Krause, B. Nachman, D. Salamani, D. Shih, and A. Zaborowska, “Fast Calorimeter Simulation Challenge 2022 - Dataset 2,” (2022). [53] Y. Song and S. Ermon, “Generative modeling by estimating gradients of the data distribution,” (2019). [54] J. Ho, A. Jain, and P. Abbeel, Advances in Neural Information Processing Systems 33, 6840 (2020). [55] Y. Song, J. Sohl-Dickstein, D. P. Kingma, A. Kumar, S. Ermon, and B. Poole, ArXiv abs/2011.13456 (2021). [56] P. Vincent, Neural Computation 23, 1661 (2011). [57] B. D. Anderson, Stochastic Processes and their Applications 12, 313 (1982). [58] S. S¨arkk¨a and A. Solin, Applied stochastic diﬀerential equations, Vol. 10 (Cambridge University Press, 2019). [59] P. E. Kloeden and E. Platen, in Numerical Solution of"
+    },
+    {
+      "id": 166,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Stochastic Diﬀerential Equations (Springer, 1992) pp. 103–160. [60] G. Parisi, Nucl. Phys. B 180, 378 (1981). [61] U. Grenander and M. I. Miller, Journal of the royal statistical society series b-methodological 56, 549 (1994). [62] Fast simulation of the ATLAS calorimeter system with"
+    },
+    {
+      "id": 167,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Generative Adversarial Networks, Tech. Rep. (CERN, Geneva, 2020). [63] O. Ronneberger, P. Fischer, and T. Brox, in International Conference on Medical image computing and computer-assisted intervention (Springer, 2015) pp. 234– 241. [64] P. Ramachandran, B. Zoph, and Q. V. Le, arXiv preprint arXiv:1710.05941 (2017). [65] M. Tancik, P. Srinivasan, B. Mildenhall, S. Fridovich-"
+    },
+    {
+      "id": 168,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "Keil, N. Raghavan, U. Singhal, R. Ramamoorthi, J. Barron, and R. Ng, Advances in Neural Information Processing Systems 33, 7537 (2020)."
+    },
+    {
+      "id": 169,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "[66] M. Arjovsky, S. Chintala, and L. Bottou, in International conference on machine learning (PMLR, 2017) pp. 214– 223. [67] I. Gulrajani, F. Ahmed, M. Arjovsky, V. Dumoulin, and"
+    },
+    {
+      "id": 170,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "A. C. Courville, Advances in neural information processing systems 30 (2017). [68] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol, and K. Kr¨uger, Comput. Softw. Big Sci. 5, 13 (2021), arXiv:2005.05334 [physics.ins-det]. [69] M. Abadi, P. Barham, J. Chen, Z. Chen, A. Davis,"
+    },
+    {
+      "id": 171,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "J. Dean, M. Devin, S. Ghemawat, G. Irving, M. Isard, et al., in OSDI, Vol. 16 (2016) pp. 265–283. [70] D. Kingma and J. Ba, (2014), arXiv:1412.6980 [cs]. [71] A. Sergeev and M. D. Balso, arXiv preprint arXiv:1802.05799 (2018). [72] A. Jolicoeur-Martineau, K. Li, R. Pich´e-Taillefer, T. Kachman, and I. Mitliagkas, arXiv preprint arXiv:2105.14080 (2021). [73] Q. Zhang and Y. Chen, arXiv preprint arXiv:2204.13902"
+    },
+    {
+      "id": 172,
+      "page": 13,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "(2022). [74] Z. Lyu, X. Xu, C. Yang, D. Lin, and B. Dai, arXiv preprint arXiv:2205.12524 (2022). [75] C. Lu, Y. Zhou, F. Bao, J. Chen, C. Li, and J. Zhu, arXiv preprint arXiv:2206.00927 (2022). [76] Z. Xiao, K. Kreis, and A. Vahdat, in International Conference on Learning Representations (ICLR) (2022). [77] T. Q. Chen, Y. Rubanova, J. Bettencourt, and D. Duvenaud, CoRR abs/1806.07366 (2018), 1806.07366. [78] J. Skilling, “The eigenvalues of mega-dimensional matrices,” in Maximum Entropy and Bayesian Methods: Cambridge, England, 1988, edited by J. Skilling (Springer Netherlands, Dordrecht, 1989) pp. 455–466. [79] M. Hutchinson, Communications in Statistics - Simulation and Computation 19, 433 (1990), https://doi.org/10.1080/03610919008812866."
+    },
+    {
+      "id": 173,
+      "page": 14,
+      "section": "continuous normalizing ﬂows",
+      "text": "Full data likelihood access is obtained from the trained score-matching model by ﬁrst identifying the deterministic ordinary diﬀerential equation (ODE) associated to the SDE in Eq. 2 that reads:"
+    },
+    {
+      "id": 174,
+      "page": 14,
+      "section": "continuous normalizing ﬂows",
+      "text": "This ODE, named probability ﬂow ODE by [55], has the property of having all trajectories sharing the same marginal probability densities as the SDE in Eq. 2 and is fully determined once the score function is estimated by the generative model. The time evolution of the density is given by the instantaneous change of variables deﬁned in [77]:"
+    },
+    {
+      "id": 175,
+      "page": 14,
+      "section": "continuous normalizing ﬂows",
+      "text": "log p0(x0) = log pT (xT ) +"
+    },
+    {
+      "id": 176,
+      "page": 14,
+      "section": "continuous normalizing ﬂows",
+      "text": "Eq. A2 is equivalent to the change of variables often used in continuous normalizing ﬂows. This expression can be estimated eﬃciently by ﬁrst noticing that where ∇˜fθ(xt, t) represents the Jacobian of ˜fθ and using algorithms such as the Skilling-Hutchinson trace estimator [78, 79] to approximate the trace calculation."
+    },
+    {
+      "id": 177,
+      "page": 14,
+      "section": "transformation",
+      "text": "The initial voxelization provided for datasets 2 and 3 are in Cylindrical coordinates (r,α,z′). While this set of coordinates reﬂect the detector symmetry, we found beneﬁcial to convert the voxelization to Cartesian coordinates (x,y,z). A voxel initially described in Cylindrical coordinates (ri,αi,zi) is then converted as:"
+    },
+    {
+      "id": 178,
+      "page": 14,
+      "section": "transformation",
+      "text": "xi = ri cos αi (B1) yi = ri sin αi (B2) where for simplicity we assume ri ∈[0, 1] and αi ∈[0, 2π], resulting in x ∈[−1, 1] and y ∈[−1, 1]. Since the overall transformation is not linear, some voxels of the new set of coordinates will always be empty, while others contain the sum of multiple voxels in the initial set of coordinates."
+    },
+    {
+      "id": 179,
+      "page": 14,
+      "section": "sampling parameters",
+      "text": "Results presented in this work are derived using the value of 0.2 for signal-to-noise-ratio r of the Langevin corrector (Eq. 11) and ﬁxed number of times steps of 100 for dataset 1 and 200 for datasets 2 and 3. This choice of parameters are used to balance the generation quality and the generation time. In Fig. 9 diﬀerent choices of r are compared while maintaining the same number of steps as before for all datasets and diﬀusion models, evaluated on the distribution of maximum energy fraction in a single voxel for dataset 1 and average energy deposition per layer for datasets 2 and 3, the distributions that show were observed to be more sensitive to the choice of generation parameters used."
+    },
+    {
+      "id": 180,
+      "page": 14,
+      "section": "sampling parameters",
+      "text": "Diﬀerent choices of r yield similar results for all diffusion models in both datasets 1 and 2. On the other hand, the corrector step has a stronger eﬀect on dataset 3 and is crucial to achieve good generation quality with minimal additional computational complexity."
+    },
+    {
+      "id": 181,
+      "page": 14,
+      "section": "sampling parameters",
+      "text": "Contrary to the corrector step, increasing the number of time steps directly aﬀect the generation time, dominated by the number of score function evaluations. Different choices of number of times steps are shown in Fig. 10 with r value ﬁxed to the baseline value."
+    },
+    {
+      "id": 182,
+      "page": 14,
+      "section": "sampling parameters",
+      "text": "In all cases using fewer time steps deteriorate the agreement with Geant while additional steps are able to improve the agreement in both datasets 1 and 3 while dataset 2 shows similar results compared to the baseline. In Tab. III, the time required to generate 100 calorimeter showers using diﬀerent number of time steps is listed. Even though the additional time steps improve the simulation quality, the time to generate the same amount of new observations increase by more than a factor 2."
+    },
+    {
+      "id": 183,
+      "page": 14,
+      "section": "sampling parameters",
+      "text": "TABLE III. Time comparison to generate 100 calorimeter showers using the baseline model and diﬀerent number of time steps"
+    },
+    {
+      "id": 184,
+      "page": 14,
+      "section": "sampling parameters",
+      "text": "Dataset Baseline [s] N=50 [s] N=500 [s] dataset 1 4.0 2.9 14.8 dataset 2 5.8 2.7 13.1 dataset 3 33.4 10.3 80.2"
+    },
+    {
+      "id": 185,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "VP r=0.0 VP r=0.3 CaloScore: VP Geant4"
+    },
+    {
+      "id": 186,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy subVP r=0.0 subVP r=0.3 CaloScore: subVP Geant4"
+    },
+    {
+      "id": 187,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "VE r=0.0 VE r=0.3 CaloScore: VE Geant4"
+    },
+    {
+      "id": 188,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy"
+    },
+    {
+      "id": 189,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "CaloScore: VP VP r=0.0 VP r=0.3 Geant4"
+    },
+    {
+      "id": 190,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 191,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy"
+    },
+    {
+      "id": 192,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "CaloScore: subVP subVP r=0.0 subVP r=0.3 Geant4"
+    },
+    {
+      "id": 193,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "CaloScore: VE VE r=0.0 VE r=0.3 Geant4"
+    },
+    {
+      "id": 194,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 195,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "CaloScore: VP VP r=0.0 VP r=0.3 Geant4"
+    },
+    {
+      "id": 196,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 197,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 198,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "CaloScore: subVP subVP r=0.0 subVP r=0.3 Geant4"
+    },
+    {
+      "id": 199,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "CaloScore: VE VE r=0.0 VE r=0.3 Geant4"
+    },
+    {
+      "id": 200,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 201,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 202,
+      "page": 15,
+      "section": "sampling parameters",
+      "text": "FIG. 9. Comparison of diﬀerent signal-to-noise choices on the maximum energy fraction deposited in a single voxel for dataset 1 (top) and average energy deposition per layer for datasets 2 (middle) and 3 (bottom) for the three diﬀerent diﬀusion models: VP (left), subVP(middle), and VE (right)."
+    },
+    {
+      "id": 203,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "VP 50 steps VP 500 steps CaloScore: VP Geant4"
+    },
+    {
+      "id": 204,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy subVP 50 steps subVP 500 steps CaloScore: subVP Geant4"
+    },
+    {
+      "id": 205,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "VE 50 steps VE 500 steps CaloScore: VE Geant4"
+    },
+    {
+      "id": 206,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy"
+    },
+    {
+      "id": 207,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "CaloScore: VP VP 50 steps VP 500 steps Geant4"
+    },
+    {
+      "id": 208,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 209,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0.0 0.2 0.4 0.6 0.8 1.0 Max. voxel/Dep. energy"
+    },
+    {
+      "id": 210,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "CaloScore: subVP subVP 50 steps subVP 500 steps Geant4"
+    },
+    {
+      "id": 211,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "CaloScore: VE VE 50 steps VE 500 steps Geant4"
+    },
+    {
+      "id": 212,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 213,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "CaloScore: VP VP 50 steps VP 500 steps Geant4"
+    },
+    {
+      "id": 214,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 215,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 216,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "CaloScore: subVP subVP 50 steps subVP 500 steps Geant4"
+    },
+    {
+      "id": 217,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "CaloScore: VE VE 50 steps VE 500 steps Geant4"
+    },
+    {
+      "id": 218,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 219,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "0 10 20 30 40 Layer number"
+    },
+    {
+      "id": 220,
+      "page": 16,
+      "section": "sampling parameters",
+      "text": "FIG. 10. Comparison of diﬀerent number of time steps on the maximum energy fraction deposited in a single voxel for dataset 1 (top) and average energy deposition per layer for datasets 2 (middle) and 3 (bottom) for the three diﬀerent diﬀusion models: VP (left), subVP(middle), and VE (right)."
+    }
+  ],
+  "skipped_pages": []
+}

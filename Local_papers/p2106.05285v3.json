@@ -1,0 +1,1766 @@
+{
+  "source": "p2106.05285v3.pdf",
+  "title": null,
+  "num_pages": 33,
+  "paragraphs": [
+    {
+      "id": 1,
+      "page": 1,
+      "section": "Flows",
+      "text": "Claudius Krause∗and David Shih†"
+    },
+    {
+      "id": 2,
+      "page": 1,
+      "section": "Flows",
+      "text": "NHETC, Dept. of Physics and Astronomy, Rutgers University, Piscataway, NJ 08854, USA"
+    },
+    {
+      "id": 3,
+      "page": 1,
+      "section": "Flows",
+      "text": "We introduce CaloFlow, a fast detector simulation framework based on normalizing ﬂows. For the ﬁrst time, we demonstrate that normalizing ﬂows can reproduce many-channel calorimeter showers with extremely high ﬁdelity, providing a fresh alternative to computationally expensive Geant4 simulations, as well as other state-of-the-art fast simulation frameworks based on GANs and VAEs. Besides the usual histograms of physical features and images of calorimeter showers, we introduce a new metric for judging the quality of generative modeling: the performance of a classiﬁer trained to diﬀerentiate real from generated images. We show that GAN-generated images can be identiﬁed by the classiﬁer with nearly 100% accuracy, while images generated from CaloFlow are better able to fool the classiﬁer. More broadly, normalizing ﬂows oﬀer several advantages compared to other state-of-the-art approaches (GANs and VAEs), including: tractable likelihoods; stable and convergent training; and principled model selection. Normalizing ﬂows also provide a bijective mapping between data and the latent space, which could have other applications beyond simulation, for example, to detector unfolding."
+    },
+    {
+      "id": 4,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The amazing successes of the LHC physics program in probing Nature at its most fundamental level have been made possible only through an enormous, accompanying computational eﬀort. This includes not only computation related to the data itself (acquisition, reconstruction, analysis), but also computation related to detailed and accurate simulation of the Standard Model (SM). (For recent reviews of the current status and future plans of computing at LHC, see [1–5].) In fact, the latter eﬀort (simulation) consumes by far the lion’s share of computational resources of the LHC collaborations. And within that, simulation of the detector response is the single most expensive element of the LHC computational pipeline. (See e.g. Fig. 1 of [3].) Using Geant4 [6–8] to simulate the full detector can take minutes per event. This in turn can severely limit analyses that rely on Monte Carlo simulations of SM processes."
+    },
+    {
+      "id": 5,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "In recent years, there has been considerable interest in the potential of machine learning and deep generative modeling to speed up detector simulations [9–17]. The idea is to train a neural network to faithfully reproduce the probability density of simulated events. By sampling from this ﬁtted probability density, one can in principle generate realistic calorimeter images while shortcutting the computationally expensive ab initio modeling of the detector."
+    },
+    {
+      "id": 6,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "The applications of deep generative modeling to calorimeter simulation have so far almost entirely focused on Generative Adverserial Networks (GANs) [18], as can be seen from the references given above.1 GANs are the dominant deep learning framework for generative modeling of natural images, achieving stunning performance on a multitude of tasks, including: producing realistic images that can even fool most human observers, creating original artworks, photo-realistic in-painting, creating “deepfake” videos, face swapping, and face aging. They have also been used for a variety of other tasks in high-energy physics (HEP) [9–15, 20–49]. In applications to fast calorimeter simulation, GANs have been demonstrated to be capable of reproducing Geant4 calorimeter images with reasonable accuracy (both at the individual image level but more importantly at the distributional level), while gaining up to 5 orders of magnitude in computational speed."
+    },
+    {
+      "id": 7,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "However, at the same time, GANs also have their drawbacks (see [50] for a nice recent overview). The GAN loss is famously a non-convex min-max objective, and while theoretically this objective is optimized when the learned distribution matches the true distribution, because of the inherent instability to the training, they do not necessarily converge to this optimum in a controlled and measurable way. This leads to many well-known problems of GANs, most notoriously the issue of “mode collapse” where the GAN will learn to generate only a subset of the data. More generally, it is not at all clear from studies of natural images how faithfully GANs truly reproduce the underlying distribution of the data. In HEP, the need for “realistic” individual events is less important than the need for accurate distributions. Each individual event is often very sparse and not very interpretable. It is only by aggregating a large"
+    },
+    {
+      "id": 8,
+      "page": 1,
+      "section": "I. INTRODUCTION",
+      "text": "∗Claudius.Krause@rutgers.edu † shih@physics.rutgers.edu 1 The exceptions are: [13], which also considered a Variational Autoencoder (VAE); and [15, 16], which considered a novel architecture called Bib-AE [19] that combines GANs with VAEs."
+    },
+    {
+      "id": 9,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "number of events together and examining their distributions that we learn anything meaningful. This suggests that other approaches besides GANs could have advantages."
+    },
+    {
+      "id": 10,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "In this paper we explore, for the ﬁrst time, a completely diﬀerent approach to deep generative modeling of calorimeter images: density estimation with normalizing ﬂows (for recent reviews and original references, see e.g. [51, 52]). Normalizing ﬂows use neural networks to learn a bijective mapping (with tractable Jacobian) between the data and a latent space described by a simple probability distribution (e.g. uniform or Gaussian). Being bijective (i.e. invertible), this transformation can in principle be run in either direction, allowing the probability density of existing data points to be inferred (density estimation with a tractable likelihood), and allowing new samples to be generated that follow the ﬁtted distribution of data. Normalizing ﬂows are capable of ﬁtting complex, multimodal distributions in high dimensional spaces, far better than previous methods (such as kernel density estimation and Gaussian mixture models) [53, 54]. Because they are parametrized by neural networks, normalizing ﬂows strongly beneﬁt from the expressivity and robustness that come with deep learning."
+    },
+    {
+      "id": 11,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "While normalizing ﬂows have been applied to event generation and phase space integration [55–60], unfolding [61], data-driven background estimation [62], inference [63], and anomaly detection [64] previously in our ﬁeld, these were all much lower-dimensional spaces than the calorimeter images we will consider in this work. Here we will demonstrate, for the ﬁrst time, that normalizing ﬂows are capable of describing the very high-dimensional space of Geant4-generated calorimeter images with extremely high ﬁdelity."
+    },
+    {
+      "id": 12,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "For our study, we will use the calorimeter setup of the original CaloGAN paper [9, 10], and compare our results to those of the CaloGAN. The calorimeter is a simpliﬁed version of the ATLAS electromagnetic calorimeter, with three layers of sizes 3 × 96, 12 × 12 and 12 × 6 voxels respectively. The Geant4 data corresponds to e+, π+ and γ’s perpendicularly incident on the calorimeter with energies uniformly sampled from 1–100 GeV. For several reasons, we chose to start with the simpler, but-still-very-high-dimensional setup of CaloGAN instead of the evenhigher-dimensional calorimeters considered in more recent works (e.g. 12×15×7 dimensional calorimeter of [12] or the 30 × 30 × 30 ILD-prototype detector of [15, 16]). As this paper is the ﬁrst demonstration of normalizing ﬂows for fast calorimeter simulation, it is meant to be a proof of concept, and reproducing the 504 voxels of the CaloGAN setup is already a major leap for normalizing-ﬂow-based modeling in our ﬁeld. Furthermore, demonstrating CaloFlow on a simpliﬁed ATLAS ECAL setup could have more immediate applications (i.e. to the actual ATLAS detector)."
+    },
+    {
+      "id": 13,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "By a similar token, while it would have been interesting to compare to other state-of-the-art GAN architectures, such as WGAN-GP [65, 66], we believe that CaloGAN is still indicative of the pros and cons of GAN-based fast simulation. In particular, characteristics such as the failing of the “ultimate” classiﬁer test (explained below) also apply to more recent setups like the BIB-AE [15, 16], as was shown in [41]. Finally, from a more practical standpoint, CaloGAN made its Geant4 training data [67] and source code including Geant4 conﬁguration [68] fully publicly available, so this greatly facilitated the comparison."
+    },
+    {
+      "id": 14,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "For the normalizing ﬂow, we will use a combination of Masked Autoencoders for Distribution Estimation (MADE) [69] and Neural Spline Flows [70] to maximize expressive power."
+    },
+    {
+      "id": 15,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "An innovative aspect of our approach is that we train two separate normalizing ﬂows, a smaller one to learn the distribution of energies deposited in the three layers of the calorimeter, and a larger one to learn the shower shapes in each layer. The ﬁrst ﬂow is constructed so that energy conservation is automatically ensured, while the second one learns images with unit-normalized total intensities, guaranteeing that the focus is on shower shapes in each layer and not on just the brightest voxels overall. This two-step generative framework could be useful even beyond normalizing ﬂows, and could potentially also improve GAN-based calorimeter simulations."
+    },
+    {
+      "id": 16,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "We will show that CaloFlow improves greatly upon the original CaloGAN results and achieves an excellent description of the Geant4 calorimeter images. We will perform qualitative comparisons of average and nearestneighbor images, as well as more quantitative comparisons of histograms of important physics features such as energies, shower widths, and sparsity. Finally, we will demonstrate the extremely high ﬁdelity of CaloFlow generated images using a new quantitative metric: a binary classiﬁer trained to distinguish Geant4 and generated images.2 An optimal classiﬁer would be the “ultimate” metric for generative modeling, as it would be the most powerful test of preal(x) vs. pgenerated(x) by the Neyman-Pearson lemma, resulting in random guessing between real and generated images if and only if preal(x) = pgenerated(x). Of course, given ﬁnite training data and model capacity, any real-life classiﬁer will be suboptimal. We will see plenty of evidence of this suboptimality: in the fact that our classiﬁer scores will depend on preprocessing, data representation and model architecture. Nevertheless, we believe even an approximately optimal classiﬁer metric can be a very informative metric for generative model quality that provides a unique window into the multivariate correlations between features in a high-dimensional phase space. All in all, we will see that our trained"
+    },
+    {
+      "id": 17,
+      "page": 2,
+      "section": "I. INTRODUCTION",
+      "text": "2 Previous studies have focused on weaker classiﬁer tests, such as training a classiﬁer to distinguish between images of diﬀerent particle types, and seeing if there is any diﬀerence in performance when switching out Geant4 for generated images. This is because the strong classiﬁer test always distinguished the GAN vs. real samples with nearly 100% accuracy [41, 71]."
+    },
+    {
+      "id": 18,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "classiﬁer can learn with essentially perfect accuracy to distinguish between Geant4 and CaloGAN images, but has a much more diﬃcult time distinguishing between Geant4 and CaloFlow images."
+    },
+    {
+      "id": 19,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "We believe deep generative modeling with normalizing ﬂows oﬀers the following advantages over GAN-based simulations:"
+    },
+    {
+      "id": 20,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "• Training a density estimator is a straightforward objective, unlike GANs which are saddle points. Therefore, the training and convergence are much more stable."
+    },
+    {
+      "id": 21,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "• Since the loss of the density estimator is just the maximum likelihood, model selection is also completely straightforward. With GANs, it is often very challenging to select the “best epoch” since the generator and discriminator (or critic) losses are not so meaningful and often one must resort to subjective or ad hoc criteria (see e.g. [15, 17]). With ﬂows, one just selects the epoch with the lowest loss on the validation set and this is more or less guaranteed to give the best results."
+    },
+    {
+      "id": 22,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "• GANs only learn the likelihood implicitly (if at all), while density estimators produce a tractable, diﬀerentiable likelihood. This could have other applications beyond just generative modeling, e.g. parameter inference for particle reconstruction."
+    },
+    {
+      "id": 23,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "• Since GANs do not ﬁt the likelihood explicitly, they are prone to mode collapse and other pitfalls such as artifacts in images. We will show that CaloFlow is much more robust against mode collapse and that its images are objectively much closer to the Geant4 ones."
+    },
+    {
+      "id": 24,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "• In a similar vein, since normalizing ﬂows learn a bijective mapping that can be run in either direction, the CaloFlow could have more applications, e.g. to detector unfolding [61] or to understanding uncertainties [60]."
+    },
+    {
+      "id": 25,
+      "page": 3,
+      "section": "I. INTRODUCTION",
+      "text": "The outline of our paper is as follows. In Section II we give an introduction/overview to density estimation with normalizing ﬂows (with further details in Appendix A). Section III contains a brief description of the calorimeter setup, which is taken from [10]. In Section IV, we deﬁne the speciﬁc 2-step architecture that we use for CaloFlow and describe the preprocessing and postprocessing steps involved in training and generation. Finally, Section V contains the main results of the paper — average and nearest-neighbor images, histograms of physics features, and the direct classiﬁer metric. We conclude in Section VI with a summary and a list of interesting future directions."
+    },
+    {
+      "id": 26,
+      "page": 3,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "Normalizing Flows (NFs) [51, 52, 72] are a special machine learning architecture that learn a bijective transformation between two spaces: the original data space x, where the data is described by an unknown (and usually complicated) probability density p(x); and a “base” or “latent” space z, where the data follows a simple (usually uniform or normal) distribution π(z). Under a bijective mapping x = f −1(z), the densities change according to det ∂f(x)"
+    },
+    {
+      "id": 27,
+      "page": 3,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "In the “forward” direction3, we start from a sample x in the data and infer its probability density via the ﬁrst part of eq. (1). The NF is a density estimator for the data. In the “inverse” direction, we start from a sample z of the base distribution and use the second part of eq. (1) to map the sample to data-space. The NF acts as generative model in this case. In contrast to GANs, which learn the probability density implicitly, normalizing ﬂows learn p(x) explicitly. This has the advantage of a more stable and convergent training (−log p(x) is minimized directly) and no propensity for mode-collapse in training (for suﬃciently expressive f)."
+    },
+    {
+      "id": 28,
+      "page": 3,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "As is evident from eq. (1), a tractable implementation of the bijective mapping requires tractability of the inverse as well as of the Jacobian determinant. NFs achieve this by using “simple” transformations f(x;⃗κ) that are analytically invertible and whose parameters⃗κ are given by neural networks. By using speciﬁc architectures that have the autoregressive property (i.e. transformations of coordinate xi depend only on the previous coordinates x1, . . . , xi−1), the Jacobian matrix can be made triangular, such that the determinant can be computed in linear time as product of the diagonal entries (instead of in cubic time for a generic matrix). To ensure that the NF can learn complicated, highdimensional data, a series of these simple bijectors (“blocks”) is chained together to form the full bijective mapping between data and the base distribution."
+    },
+    {
+      "id": 29,
+      "page": 3,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "3 Of course, “forward” and “inverse” are a matter of convention. The choice here agrees with the terminology in the software package nflows [73] that we use."
+    },
+    {
+      "id": 30,
+      "page": 4,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "In the ML literature, many options have been devised for both the family of transformations f(x;⃗κ) (e.g. aﬃne transformations [74] or splines [70]); as well as the neural network architecture for their parameters⃗κ (e.g. MADE blocks [69] and coupling layers [53]).4 In principle, these two components of normalizing ﬂows can be chosen independently of one another. In the HEP literature, the MAF architecture [54] (aﬃne transformations with MADE blocks for the parameters) was used in ANODE [64] for anomaly detection, and coupling layers with rational quadratic splines (RQS) [70] were used in i-flow [55, 56] for phase space integration."
+    },
+    {
+      "id": 31,
+      "page": 4,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "In this paper, we will consider a combination of transformations and neural network parametrizations that we believe maximizes the expressivity of the normalizing ﬂows: RQS transformations with MADE blocks for the parameters."
+    },
+    {
+      "id": 32,
+      "page": 4,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "• MADE blocks oﬀer superior density estimation performance compared to coupling layers [54]. The price one pays for this is that the MADE approach is very fast in one direction, as the full set of transformation parameters are given by the outputs of a single pass through the MADE block. The other direction, however, is slow in evaluation as the parameters for the inverse transformation can only be obtained by looping through all dimensions. (Coupling layer based approaches tend to be equally fast in both directions.) Depending on the use case and the available computing resources, one can choose to implement the faster pass for the densityestimation direction, yielding a masked autoregressive ﬂow (MAF) [54]; or implement the faster pass for the sampling direction, yielding an inverse autoregressive ﬂow (IAF) [75].5 Even though our main application would be sampling (generation of calorimeter showers), we implemented the MAF-style architecture, as it was impossible to store the gradients of the IAF-style architecture while looping through 504 dimensions. Even if the memory constraints could be overcome, training the IAF-style architecture would still take signiﬁcantly longer than the MAF-style architectecture, making it likely prohibitive. Instead, in a future project [76], we explore the combination of a MAF with an IAF to beneﬁt from the best of both, known as Probability Density Distillation [77]."
+    },
+    {
+      "id": 33,
+      "page": 4,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "• For the family of transformations z = f(x), we will use the monotonic rational quadratic splines (RQS) from [70, 78] to further increase the expressivity of the normalizing ﬂow. These are continuous functions with continuous ﬁrst derivatives, which are deﬁned in a piecewise manner on intervals in some bounded, square region [−B, B] of x and z space, with the tail bound B being a ﬁxed hyperparameter, not parametrized with a neural network. (Outside of [−B, B] the transformation is taken to be the identity mapping.) On each interval, the transformation is a rational quadratic function [70, 78], where ξ = (x−x0)/(x1 −x0), s = (z1 −z0)/(x1 −x0), and x0(1), z0(1), and d0(1) are the locations and derivatives at the left (right) boundary of the interval. In total, after imposing continuity of the function and its ﬁrst derivatives, there are a total of 3(n −1) parameters for an n-interval RQS. In practice for numerical stability, the algorithm of [70] uses one more pair of (x, z) locations and renormalizes the ranges to have length 2B, increasing the number of parameters to a total of 3n −1. These were summarized as⃗κ above. The inverse of the transformation is given by the positive root solution of a quadratic equation, leading to a monotonically increasing x within the boundary of the original distribution. Further details on the implementation and numerical stability can be found at [70]."
+    },
+    {
+      "id": 34,
+      "page": 4,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "Figure 1 shows the schematic view of a sample MADE block (this is just an example for illustration purposes; it is not the exact architecture we are using for CaloFlow) on the left. There, a three-dimensional distribution x is transformed based on a four-dimensional conditional vector⃗c. The input layers for the three coordinate and four conditional inputs have 6 neurons each. Their outputs are summed and then fed into the subsequent hidden layers. There are two such hidden layers of 6 neurons each and there is an output layer with 15 neurons, giving the parameters⃗κ for 3 RQSs with 2 bins each. The connections inside the network are masked, such that the parameters of transformation i only depend on coordinates k < i. Connections are colored to illustrate this: Red connections, yielding the parameters⃗κ1 of the RQS transforming x1, only connect back to x0 and⃗c; blue connections, yielding the parameters⃗κ2 of the RQS transforming x2, only connect back to x0, x1, and⃗c.⃗κ0 is given by a trainable bias term, with no connection to the bijector or conditional input. On the right, we show an example for a 2-bin RQS. We highlight the 5 parameters⃗κ coming from the MADE block in green."
+    },
+    {
+      "id": 35,
+      "page": 4,
+      "section": "II. DENSITY ESTIMATION WITH NORMALIZING FLOWS",
+      "text": "4 See appendix A for a more detailed description of these architectures. 5 While the original references for MAF [54] and IAF [75] only use aﬃne transformations, we use the terminology for a generic stack of MADE blocks with any type of transformation."
+    },
+    {
+      "id": 36,
+      "page": 5,
+      "section": "MADE Block",
+      "text": "bijector input cond. input transformation parameters"
+    },
+    {
+      "id": 37,
+      "page": 5,
+      "section": "RQS Transformation",
+      "text": "FIG. 1. Left: Schematic view of a MADE block. There are 3 variables xi to be transformed and there are 4 additional variables ci which the transformation is conditioned on. This example uses input layers with 6 nodes, two hidden layers with 6 nodes, and an output layer with 15 nodes for⃗κi, where the latter number is given by the required parameters of a 2-bin rational quadratic spline transformation. Red connections show that⃗κ1 only depend on x0 and⃗c. Blue connections show that⃗κ2 only depend on x0, x1 and⃗c. Right: An example for a 2-bin rational quadratic spline transformation. Green color indicates the parameters⃗κ coming from a NN: all but one of the knot locations, and the derivatives of all internal knots. Outside the domain [-B, B], the identity transformation is applied (indicated by the black dashed line)."
+    },
+    {
+      "id": 38,
+      "page": 5,
+      "section": "III. CALORIMETER SETUP",
+      "text": "TABLE I. Sizes of the calorimeter voxels. The z axis is along the particle propagation direction (corresponding to radial direction in a full detector), the η axis is along the proton beam axis and φ is perpendicular to z and η [10]."
+    },
+    {
+      "id": 39,
+      "page": 5,
+      "section": "III. CALORIMETER SETUP",
+      "text": "Layer z length [mm] η length [mm] φ length [mm] number of voxels 0 90 5 160 3 × 96 1 347 40 40 12 × 12 2 43 80 40 12 × 6"
+    },
+    {
+      "id": 40,
+      "page": 5,
+      "section": "III. CALORIMETER SETUP",
+      "text": "As described in the Introduction, we base our proof-of-concept study heavily oﬀof the CaloGAN setup of [9, 10]. The toy calorimeter of CaloGAN was a three-layer, liquid argon (LAr) calorimeter cube with 480mm side-length. The training data consisted of Geant4 calorimeter images for three particle types (e+, γ and π+). These are electromagnetic showers only (ECAL). The particles are perpendicularly incident with energy Einc uniformly sampled from 1–100 GeV. The voxel sizes are not uniform (see table I), yielding a diﬀerent resolution in the three layers. The ﬁrst, second and third layer has resolution 3 × 96, 12 × 12 and 12 × 6 respectively. Importantly, the deposited energy is not exactly Einc due to leakage and punch-through (especially with the pions)."
+    },
+    {
+      "id": 41,
+      "page": 5,
+      "section": "III. CALORIMETER SETUP",
+      "text": "While the original Geant4 samples that were used to train CaloGAN are publicly available at [67], we chose instead to generate our own samples [79] using the Geant4 code provided with CaloGAN [68]. We checked that our Geant4 samples were indistiguishable from the ones used in the original CaloGAN work at the level of histograms and average images, but to be safe we chose not to mix and match the two samples, since they were produced with newer versions of Geant4, the C compiler, etc."
+    },
+    {
+      "id": 42,
+      "page": 5,
+      "section": "III. CALORIMETER SETUP",
+      "text": "Since there are a total of 100,000 calorimeter images of each particle type in the dataset [67], we generated 100,000 samples with Geant4 based on the code provided at [68]. We use 70,000 of them for training and 30,000 for testing. (CaloGAN used the full set of 100,000 for training.) For the classiﬁer test of Section V D, we generate an additional,"
+    },
+    {
+      "id": 43,
+      "page": 6,
+      "section": "III. CALORIMETER SETUP",
+      "text": "TABLE II. Composition of Flow I and Flow II. “MADE input dimension” refers to bijector and conditional input, see ﬁg. 1, top left. “Input layer size” refers to the ﬁrst hidden layer which merges bijector and conditional input. The size of the output layer is determined by the number of RQS bins and the dimensionality of the data space."
+    },
+    {
+      "id": 44,
+      "page": 6,
+      "section": "III. CALORIMETER SETUP",
+      "text": "MADE input base number of layer sizes number of dimension distribution MADE blocks input hidden output RQS bins"
+    },
+    {
+      "id": 45,
+      "page": 6,
+      "section": "III. CALORIMETER SETUP",
+      "text": "Flow I 3+1 3-dim 6 64 2×64 69 8 Standard Normal"
+    },
+    {
+      "id": 46,
+      "page": 6,
+      "section": "III. CALORIMETER SETUP",
+      "text": "Flow II 504+4 504-dim 8 378 1×378 11592 8 Standard Normal independent sample of 100,000 calorimeter images of each particle type with Geant4. We split this set into sets of 60,000 for training, 20,000 for validation, and 20,000 for testing [79]."
+    },
+    {
+      "id": 47,
+      "page": 6,
+      "section": "IV. CALOFLOW",
+      "text": "Our goal is to learn the full joint probability density p(⃗I|Einc) of the 504 calorimeter voxel intensities⃗I, conditioned on the input energy Einc. We will treat each particle type — e+, γ and π+ — as a separate density estimation problem."
+    },
+    {
+      "id": 48,
+      "page": 6,
+      "section": "IV. CALOFLOW",
+      "text": "The simplest and most direct approach would be to train a single NF on the full calorimeter. Unfortunately, this turned out to be insuﬃciently precise for the high degree of energy conservation that we require. Training separate NFs on the voxels of each calorimeter layer⃗Ik, conditioned on the energy depositions of the voxels in previous calorimeter layers⃗I0, . . . ,⃗Ik−1, also proved to be inadequate. Instead, what worked well was a modular, two-step setup in which one NF (which we call “Flow I”) ﬁrst learns the distribution of deposited energies conditioned on the input energy, p1(E0, E1, E2|Einc),6 and then another NF (which we call “Flow II”) learns the shower shapes conditioned on the energies, p2(⃗I|E0, E1, E2, Einc). In this setup, Flow I and Flow II are independent from each other, meaning Flow I can be replaced by an improved version without the need to retrain Flow II, or vice versa."
+    },
+    {
+      "id": 49,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "density estimation in training, Einc from GEANT4 data"
+    },
+    {
+      "id": 50,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "3 dim. Base dist. MADE"
+    },
+    {
+      "id": 51,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "Normalizing Flow Bijector — Flow I GEANT4 data pre-processing sampled E0, E1, E2 post-processing"
+    },
+    {
+      "id": 52,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "RQS RQS perm. RQS perm. RQS perm."
+    },
+    {
+      "id": 53,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "sampling of E0, E1, E2 for Einc"
+    },
+    {
+      "id": 54,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "FIG. 2. Schematic view of Flow I. Random permutations (perm.) are between MADE blocks. Pre-processing (for training and density estimation) and post-processing (for sampling) are explained in the main text. The green arrows indicate the parameters κ that deﬁne the RQS."
+    },
+    {
+      "id": 55,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "The distribution of layer-wise energy deposits, p1(E0, E1, E2|Einc), is learned by an NF (“Flow I”) whose speciﬁcations are in the top row of table II and which is sketched in ﬁg. 2. Note that there are two input layers to the MADE block of the same size, one autoregressive one for the 3 input dimensions and one “normal” one for the conditioning on the total event energy, Einc, (see ﬁg. 1 for a schematic view of the MADE block using this input setup). In between the MADE blocks, we randomly permute all dimensions to capture correlations between them better. We do not use"
+    },
+    {
+      "id": 56,
+      "page": 6,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "6 Using a normalizing ﬂow for this low-dimensional density estimation problem might be overkill, and simpler alternatives such as KDE [80, 81] or Mixture Density Networks [82] might also prove viable."
+    },
+    {
+      "id": 57,
+      "page": 7,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "dropout or batch normalization. We note that this architecture easily scales to more complicated setups with more calorimeter layers."
+    },
+    {
+      "id": 58,
+      "page": 7,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "To ensure energy conservation, the energy depositions in the calorimeter layers (E0, E1, E2) are transformed to u ∈[0, 1]3, where"
+    },
+    {
+      "id": 59,
+      "page": 7,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "In other words, u0 is the ratio of the deposited to the incident energy, and ui with i > 0 is the ratio of the energy deposited in layer i−1 to the net remaining, available energy. This transformation is invertible provided Einc is given. For later convenience, we deﬁne the total deposited energy ˆEtot ≡E0 + E1 + E2 = P⃗I."
+    },
+    {
+      "id": 60,
+      "page": 7,
+      "section": "A. Flow I: learning the energy depositions per layer",
+      "text": "To better learn distributions that are localized towards the boundaries, we transform⃗u one more time, to logit space via"
+    },
+    {
+      "id": 61,
+      "page": 7,
+      "section": "ulogit,i = log (4)",
+      "text": "where"
+    },
+    {
+      "id": 62,
+      "page": 7,
+      "section": "ulogit,i = log (4)",
+      "text": "The cutoﬀα ensures that the boundaries 0 and 1 map to ﬁnite values of ±13.82. We therefore choose the tail bound of the RQS to be B = 14. Flow I is trained on the features ulogit, which when transformed back to (E0, E1, E2), ensures that ˆEtot ≤Einc."
+    },
+    {
+      "id": 63,
+      "page": 7,
+      "section": "ulogit,i = log (4)",
+      "text": "Before being used an a conditional input to Flow I, the incident energy is transformed as log10 (Einc/10 GeV) ∈[−1, 1]. (6)"
+    },
+    {
+      "id": 64,
+      "page": 7,
+      "section": "ulogit,i = log (4)",
+      "text": "Working in log-space helped the ﬂow to learn the distribution for small energies better. We train Flow I by minimizing the negative log-likelihood, −log p1(E0, E1, E2|Einc), with a batch size of 175 for 75 epochs using the ADAM [83] optimizer with an initial learning rate of 10−4. We use a learning rate schedule that applies an additional factor of 0.5 to the learning rate after the epochs [5, 15, 40, 60]. We use the model state of the ﬂow with the lowest test loss in the following."
+    },
+    {
+      "id": 65,
+      "page": 7,
+      "section": "B. Flow II: learning the shower shapes",
+      "text": "GEANT4 data density estimation in training, E0, E1, E2 from GEANT4 data"
+    },
+    {
+      "id": 66,
+      "page": 7,
+      "section": "B. Flow II: learning the shower shapes",
+      "text": "504 dim. Base dist. MADE"
+    },
+    {
+      "id": 67,
+      "page": 7,
+      "section": "B. Flow II: learning the shower shapes",
+      "text": "Normalizing Flow Bijector — Flow II"
+    },
+    {
+      "id": 68,
+      "page": 7,
+      "section": "Block",
+      "text": "CaloFlow samples"
+    },
+    {
+      "id": 69,
+      "page": 7,
+      "section": "Block",
+      "text": "RQS RQS inv. RQS perm. RQS inv."
+    },
+    {
+      "id": 70,
+      "page": 7,
+      "section": "Block",
+      "text": "shower generation, E0, E1, E2 from Flow I"
+    },
+    {
+      "id": 71,
+      "page": 7,
+      "section": "Block",
+      "text": "FIG. 3. Schematic view of Flow II. Inversions (inv.) and random permutations (perm.) are layer-wise. Pre-processing (for training and density estimation) and post-processing (for sampling) are explained in the main text; {Ei} is short for the set (E0, E1, E2). The green arrows indicate the parameters κ that deﬁne the RQS."
+    },
+    {
+      "id": 72,
+      "page": 7,
+      "section": "Block",
+      "text": "The distribution of shower shapes, p2(⃗I|E0, E1, E2, Einc), is learned by a second NF (“Flow II”) that acts on the full 288+144+72 dimensional space of all voxels and is conditioned on Einc, as well as the Ei whose distribution was learned in Flow I. See ﬁg. 3 for a detailed schematic of Flow II and the second row of table II for the speciﬁcations of Flow II. In between the MADE blocks, we alternate layer-wise order inversions and layer-wise order permutations of the variables to better capture correlations between them. Layer-wise in this context means that variables of calorimeter layer 0 stay in the ﬁrst 288 positions, variables of calorimeter layer 1 stay in the positions 289 to 432 and the variables of calorimeter layer 2 stay in the last 72 positions throughout the permutation/inversion. We found that training with a dropout [84, 85] probability of 5% enhances the performance."
+    },
+    {
+      "id": 73,
+      "page": 8,
+      "section": "Block",
+      "text": "For the training data, we transform the raw Geant4 calorimeter images in the following ways."
+    },
+    {
+      "id": 74,
+      "page": 8,
+      "section": "Block",
+      "text": "1. We found it was essential to ﬁrst apply uniform random noise in the range [0, 1] keV to all voxels when called for training. The energy distribution of each voxel is sharply peaked at zero, and without the noise regularization, the NF would expend all of its capacity ﬁtting to these sharp (and largely irrelevant) boundaries, while getting wrong the voxels with signiﬁcant, nonzero energies. To say it another way, without noise regularization, the loss and the gradients would be dominated by the dimmest voxels, and the NF would be prevented from learning how to reproduce the brighter voxels. The noise regularization was key for stabilizing the training and producing a good outcome, especially for the π+ calorimeter images since they have a large fraction of 0 voxels (see sparsity plots)."
+    },
+    {
+      "id": 75,
+      "page": 8,
+      "section": "Block",
+      "text": "2. Next, the voxel energies are normalized so that the voxels in each layer sum to one (the energy in each layer is supplied as a conditioning label so it can always be restored). The energy depositions in the diﬀerent calorimeter layers diﬀer by a large amount, see the Ei/ ˆEtot histograms of section V B. For example for e+, the fraction of deposited energy per layer peaks at about 10% in layer 0, at about 80% in layer 1, and about 0.1% for layer 2. Normalizing each layer to unit intensity helped the ﬂow to learn each layer equally well."
+    },
+    {
+      "id": 76,
+      "page": 8,
+      "section": "Block",
+      "text": "3. Finally, we transform the (noise-regularized and normalized) voxels to logit space using the transformation of eqs. (4) and (5). We again use a tail bound of B = 14 in the RQS."
+    },
+    {
+      "id": 77,
+      "page": 8,
+      "section": "Block",
+      "text": "These steps deﬁne the preprocessed data in ﬁg. 3."
+    },
+    {
+      "id": 78,
+      "page": 8,
+      "section": "Block",
+      "text": "In ﬁg. 4, we further illustrate the need for noise regularization, using example plots from training π+ with and without noise regularization. On the left, we show the training and test loss for the two cases. Without noise regularization, the loss reaches much lower values, suggesting a better ﬁt to data. This, however cannot be observed in the generated images. Notice also that without the noise regularization the value of the loss is less stable and scatters more. The sudden jump of the loss at epoch 50 comes from multiplying the learning rate by a factor 0.5 as part of our learning rate schedule. In the center, we show the average of layer 0 of 100k sampled events. Compared to the plot that uses noise regularization in training (see ﬁg. 7), we see a less uniform distribution of the voxel energies, coming from the loss being dominated by the 0 voxels. As a result, the Eratio,0 plot (right panel) is also completely oﬀ."
+    },
+    {
+      "id": 79,
+      "page": 8,
+      "section": "Block",
+      "text": "FIG. 4. Inﬂuence of noise regularization on training and results. Left: Training and test losses. Center: Layer 0 average of 100k sampled events without noise regularization in training. Right: Comparison of Eratio,0 when trained with and without noise regularization."
+    },
+    {
+      "id": 80,
+      "page": 8,
+      "section": "Block",
+      "text": "The MADE blocks in Flow II are conditioned on Einc and Ei, where Einc is encoded as in eq. (6) and Ei are the layer energies encoded as log10 ((Ei + 1 keV)/100 GeV) + 2 ∈[−6, 3]. (7)"
+    },
+    {
+      "id": 81,
+      "page": 8,
+      "section": "Block",
+      "text": "As before, working in log-space helped the ﬂow to learn the distribution for small energies better."
+    },
+    {
+      "id": 82,
+      "page": 8,
+      "section": "Block",
+      "text": "The training is then done by minimizing L = −log p2(⃗I|E0, E1, E2, Einc) using 100 epochs of the ADAM [83] optimizer with initial learning rate 10−4 that is halved after 50 epochs and a batch size of 175. The values of Ei are taken directly from the data. We select the epoch with the lowest test loss for the subsequent sample generation."
+    },
+    {
+      "id": 83,
+      "page": 9,
+      "section": "C. Sampling from CaloFlow",
+      "text": "In generation, we ﬁrst sample Ei=0,1,2 from Flow I given an input energy Einc. We then use Flow II to generate the shower shapes based on the conditionals Einc and Ei. The raw showers are ﬁrst transformed back to energy space via the sigmoid function. Then, the individual layers are rescaled to have the correct energy Ei."
+    },
+    {
+      "id": 84,
+      "page": 9,
+      "section": "C. Sampling from CaloFlow",
+      "text": "Note that while Flow II is trained on layer-wise unit-normalized shower shapes, this constraint is not imposed as part of the ﬂow (i.e. the generated images still live in the full 504 dimensional space). A well-trained NF will produce images with normalization approximately one, but there will be some scatter in the result. Therefore, when we generate from Flow II, we choose to further renormalize the generated images so they have exact unit normalization in each layer, before rescaling by Ei. This is necessary to enforce the right energies per layer. Alternatively, one could consider a normalizing ﬂow with manifold learning [86] to achieve energy conservation."
+    },
+    {
+      "id": 85,
+      "page": 9,
+      "section": "C. Sampling from CaloFlow",
+      "text": "As a ﬁnal step, we set all voxels with energy depositions below 10 keV to 0 to ensure the correct sparsity of the shower images. All these steps are what we call post-processing in ﬁg. 3."
+    },
+    {
+      "id": 86,
+      "page": 9,
+      "section": "C. Sampling from CaloFlow",
+      "text": "Our speciﬁc handling of sparse images (adding noise for training and setting a threshold after generation) is necessary, as the bijective nature of normalizing ﬂows does not allow a mapping of random variables to an absolute 0 for a large range of input values."
+    },
+    {
+      "id": 87,
+      "page": 9,
+      "section": "V. RESULTS",
+      "text": "In this section we present the results of sampling with CaloFlow, with detailed comparisons to CaloGAN and Geant4. We organize our results in order of more qualitative to more quantitative. We start with comparisons of average images and nearest neighbor images between CaloFlow and Geant4. Then we compare histograms of relevant physical quantities from CaloFlow, CaloGAN and Geant4. Finally, we compare results of training classiﬁers on the generated (CaloFlow and CaloGAN) vs. real (Geant4) images. In our histograms, we exhibit the same quantities that were already used in [10], as well as additional quantities to better assess the quality of the generated shower shapes and voxel level information (i.e. to better probe the performance of Flow II)."
+    },
+    {
+      "id": 88,
+      "page": 9,
+      "section": "V. RESULTS",
+      "text": "Since these additional histograms require the full information of all events and not just a marginalized subset, we generate our own CaloGAN sample by training CaloGAN based on the code [68] and the default hyperparameters (which match the ones deﬁned in [10].), except for the number of epochs in training, where we used 100 instead of 50. We use a diﬀerent Tensorflow [87] version (v1.14.0 instead of v.1.1.0), but the same version of Keras [88] (v2.0.3) that was used for [10]. As in [10], we did not perform any detailed model selection, but we looked at the histograms of samples based of diﬀerent epochs and used the generator state that agreed best with the Geant4 data. These were epochs 80, 50, and 100 for e+, γ, and π+, respectively. Our training yielded qualitatively similar results in all histograms compared to the ones shown in [10], except for π+, where our run seems to model the energy peaks slightly better. In the following, all histograms are based on 100k samples: the Geant4 set that we based the training of CaloFlow and CaloGAN on; 100k samples we sampled from our trained CaloGAN; and 100k samples we sampled from CaloFlow."
+    },
+    {
+      "id": 89,
+      "page": 9,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "We start the comparison by looking at the average of the 100k events we use for visualization in ﬁgs. 5 – 7. We see excellent agreement between CaloFlow and Geant4 average images; the averages of CaloFlow are smooth and very close to their Geant4 counterparts. Meanwhile CaloGAN has a few voxels with an average deposition of zero – which is only possible if those voxels are always zero. This is a sign of mode collapse, since the GAN did not learn to cover the full available phase space."
+    },
+    {
+      "id": 90,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 91,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 92,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 93,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 94,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 95,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 96,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 97,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 98,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 99,
+      "page": 10,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "FIG. 5. Average shower shapes for e+. Columns are calorimeter layers 0 to 2, top row shows CaloFlow, center row Geant4, and bottom row CaloGAN"
+    },
+    {
+      "id": 100,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 101,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 102,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 103,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 104,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 105,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 106,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 107,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 108,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 109,
+      "page": 11,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "FIG. 6. Average shower shapes for γ. Columns are calorimeter layers 0 to 2, top row shows CaloFlow, center row Geant4, and bottom row CaloGAN"
+    },
+    {
+      "id": 110,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 111,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 112,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 113,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 114,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 115,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 10 20 30 40 50 60 70 80 90 Cell ID"
+    },
+    {
+      "id": 116,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 117,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 6 7 8 9 1011 Cell ID"
+    },
+    {
+      "id": 118,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "0 1 2 3 4 5 Cell ID"
+    },
+    {
+      "id": 119,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "FIG. 7. Average shower shapes for π+. Columns are calorimeter layers 0 to 2, top row shows CaloFlow, center row Geant4, and bottom row CaloGAN"
+    },
+    {
+      "id": 120,
+      "page": 12,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "Another common method for detecting mode collapse consists of selecting elements of the Geant4 set at random and looking for their nearest neighbors in the set of generated CaloFlow samples. If mode collapse occurred in training, we would ﬁnd that some Geant4 images have very close nearest neighbors, while others have very distant ones. Figures 8–10 show 5 selected events from the Geant4 set at incident energies Einc = 5, 10, 20, 50, and 95 GeV and their Euclidean nearest neighbor in a CaloFlow dataset of 2000 samples at the same energies. We deﬁne nearest neighbors across all layers simultaneously (nearest in 504-dimensional voxel space), in contrast to the layerwise deﬁnition of [10], with the expectation that this provides a more stringent test of mode collapse. Overall, we observe nearest neighbors that are close to the target events in all cases, suggesting that no mode collapse occurred."
+    },
+    {
+      "id": 121,
+      "page": 13,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "FIG. 8. 5 randomly selected e+ events of Geant4 and their nearest neighbors in the CaloFlow samples."
+    },
+    {
+      "id": 122,
+      "page": 14,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "FIG. 9. 5 randomly selected γ events of Geant4 and their nearest neighbors in the CaloFlow samples."
+    },
+    {
+      "id": 123,
+      "page": 15,
+      "section": "A. Qualitative comparisons (average and individual images)",
+      "text": "FIG. 10. 5 randomly selected π+ events of Geant4 and their nearest neighbors in the CaloFlow samples."
+    },
+    {
+      "id": 124,
+      "page": 15,
+      "section": "B. Flow I histograms",
+      "text": "We now have a look at some distributions, starting with the ones that are only sensitive to the results of Flow I. In ﬁgs. 11, 12, and 13 we show histograms for e+, γ, and π+, respectively. All of these were also considered in [10]."
+    },
+    {
+      "id": 125,
+      "page": 15,
+      "section": "B. Flow I histograms",
+      "text": "In general, we observe that the CaloFlow samples are much closer to the Geant4 samples than the CaloGAN samples are, and the overall agreement between CaloFlow and Geant4 is quite impressive in an absolute sense. Note that all these features are learned by minimizing the log-likelihood, not by adding speciﬁc terms to the loss. In more detail:"
+    },
+    {
+      "id": 126,
+      "page": 15,
+      "section": "B. Flow I histograms",
+      "text": "• In the top rows of ﬁgs. 11 – 13, we show the energy depositions in each calorimeter layer, Ek = P Ik, as well as the total deposited energy in all three layers, ˆEtot = P2 k=0 Ek. We see that CaloFlow models the energy distributions extremely well. For π+, we see that CaloFlow models the peak a lot better than the CaloGAN. In ˆEtot we see the advantage of our two-ﬂow approach, as we have, by construction, perfect energy conservation ( ˆEtot ≤Einc)."
+    },
+    {
+      "id": 127,
+      "page": 15,
+      "section": "B. Flow I histograms",
+      "text": "• The second rows of ﬁgs. 11 – 13 show the ratio of the layer energies Ek to the total deposited energy ˆEtot. CaloFlow models these really well for all three particles, and especially the performance increase in E2/ ˆEtot compared to CaloGAN is remarkable."
+    },
+    {
+      "id": 128,
+      "page": 15,
+      "section": "B. Flow I histograms",
+      "text": "• The third rows of ﬁgs. 11 – 13 show the layer (depth)- weighted total energy, ld = P2 k=0 kEk, on the left; the layer-weighted energy normalized to the total energy, sd = ld/ ˆEtot, in the center; and the standard deviation of sd, called shower depth width σsd, on the right. The quantity sd was called “shower depth” in [10]. In ld we see CaloFlow better maps out the low-energy region compared to CaloGAN. Notice also how well CaloFlow learns the sharp feature in σsd."
+    },
+    {
+      "id": 129,
+      "page": 16,
+      "section": "B. Flow I histograms",
+      "text": "10 1 100 101 102 E1 (GeV)"
+    },
+    {
+      "id": 130,
+      "page": 16,
+      "section": "B. Flow I histograms",
+      "text": "10 2 10 1 100 101 102 E2 (GeV)"
+    },
+    {
+      "id": 131,
+      "page": 16,
+      "section": "B. Flow I histograms",
+      "text": "0 25 50 75 100 125 Etot (GeV)"
+    },
+    {
+      "id": 132,
+      "page": 16,
+      "section": "B. Flow I histograms",
+      "text": "0.5 1.0 1.5 2.0 Shower Depth sd"
+    },
+    {
+      "id": 133,
+      "page": 16,
+      "section": "B. Flow I histograms",
+      "text": "0.0 0.2 0.4 0.6 0.8 Shower Depth Width sd"
+    },
+    {
+      "id": 134,
+      "page": 16,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "FIG. 11. Distributions that are sensitive to Flow I for e+. Top row: energy deposition per layer and total energy deposition; center row: layer energy normalized to total energy deposition; bottom row: weighted energy depositions, see text for detailed deﬁnitions."
+    },
+    {
+      "id": 135,
+      "page": 17,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "10 1 100 101 102 E1 (GeV)"
+    },
+    {
+      "id": 136,
+      "page": 17,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "10 2 10 1 100 101 102 E2 (GeV)"
+    },
+    {
+      "id": 137,
+      "page": 17,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0 25 50 75 100 125 Etot (GeV)"
+    },
+    {
+      "id": 138,
+      "page": 17,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.5 1.0 1.5 2.0 Shower Depth sd"
+    },
+    {
+      "id": 139,
+      "page": 17,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.0 0.2 0.4 0.6 0.8 Shower Depth Width sd"
+    },
+    {
+      "id": 140,
+      "page": 17,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "FIG. 12. Distributions that are sensitive to Flow I for γ. Top row: energy deposition per layer and total energy deposition; center row: layer energy normalized to total energy deposition; bottom row: weighted energy depositions, see text for detailed deﬁnitions."
+    },
+    {
+      "id": 141,
+      "page": 18,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "10 1 100 101 102 E1 (GeV)"
+    },
+    {
+      "id": 142,
+      "page": 18,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "10 2 10 1 100 101 102 E2 (GeV)"
+    },
+    {
+      "id": 143,
+      "page": 18,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0 25 50 75 100 125 Etot (GeV)"
+    },
+    {
+      "id": 144,
+      "page": 18,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.5 1.0 1.5 2.0 Shower Depth sd"
+    },
+    {
+      "id": 145,
+      "page": 18,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.0 0.2 0.4 0.6 0.8 Shower Depth Width sd"
+    },
+    {
+      "id": 146,
+      "page": 18,
+      "section": "+ GEANT + CaloGAN + CaloFlow",
+      "text": "FIG. 13. Distributions that are sensitive to Flow I for π+. Top row: energy deposition per layer and total energy deposition; center row: layer energy normalized to total energy deposition; bottom row: weighted energy depositions, see text for detailed deﬁnitions."
+    },
+    {
+      "id": 147,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "We now turn to distributions that are also sensitive to Flow II. Figures 14, 15, and 16 start by showing histograms for e+, γ, and π+, respectively, that are sensitive to the events at the voxel level."
+    },
+    {
+      "id": 148,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "• In the top two rows, we show the distribution of the brightest two voxels in each layer, normalized to the total energy deposition in that calorimeter layer. We observe an improvement over CaloGAN for the π+ distributions, but also small peaks at low values in layer 2, for all particles."
+    },
+    {
+      "id": 149,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "• In the third row, we show the histograms for Eratio,k, which is the diﬀerence of the brightest and second brightest voxel of layer k, divided by their sum,"
+    },
+    {
+      "id": 150,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "While Eratio,2 for e+ and γ in CaloFlow is a bit larger than the Geant4 reference around the peaks of the distributions, we see a large improvement in all three Eratio,k for π+ over CaloGAN."
+    },
+    {
+      "id": 151,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "• In the last row, we show the sparsity of the events in the calorimeter layers. The sparsity is deﬁned as the ratio of the number of voxels with non-zero deposition to the total number of voxels in layer k. Here, CaloFlow improves a lot over CaloGAN for all particles and layers."
+    },
+    {
+      "id": 152,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "The second and third items (sparsity and Eratio,k) were also considered in [10]. We have added the histograms of the brightest and second-brightest voxels as additional probes of the quality of Flow II."
+    },
+    {
+      "id": 153,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "We investigate distributions that are sensitive to shower shapes in ﬁgures 17, 18, and 19, for e+, γ, and π+, respectively."
+    },
+    {
+      "id": 154,
+      "page": 19,
+      "section": "C. Flow II histograms",
+      "text": "• The top rows show the centroids in φ and η direction. The centroids in η (φ) are deﬁned via H (F), which are the locations of the voxel centers in units of mm, as well as"
+    },
+    {
+      "id": 155,
+      "page": 19,
+      "section": "and",
+      "text": "Here, ⊙denotes the element-wise multiplication and sum (a ⊙b = P i aibi, with i the index of the voxels in a layer), and k is the index of the calorimeter layer. The histograms for CaloFlow are all centered, as expected, for incoming particles that are centered and perpendicularly incident. For the CaloGAN, however, we observe an asymmetry in the centroids, another hint to possible mode collapse of the GAN."
+    },
+    {
+      "id": 156,
+      "page": 19,
+      "section": "and",
+      "text": "• In the last row, we show the standard deviation of the η centroid. This was also considered in [10], where it was called layer lateral width. If H is again the location of the voxel center in η direction, σk is deﬁned as"
+    },
+    {
+      "id": 157,
+      "page": 19,
+      "section": "and",
+      "text": "For e+ and γ, CaloFlow follows the Geant4 distributions well, improving over CaloGAN. The improvement is even bigger for the π+ showers."
+    },
+    {
+      "id": 158,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer0"
+    },
+    {
+      "id": 159,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer1"
+    },
+    {
+      "id": 160,
+      "page": 20,
+      "section": "and",
+      "text": "0.0 0.2 0.4 E2. brightest, layer0"
+    },
+    {
+      "id": 161,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer2"
+    },
+    {
+      "id": 162,
+      "page": 20,
+      "section": "and",
+      "text": "0.0 0.2 0.4 E2. brightest, layer1"
+    },
+    {
+      "id": 163,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 0"
+    },
+    {
+      "id": 164,
+      "page": 20,
+      "section": "and",
+      "text": "0.0 0.2 0.4 E2. brightest, layer2"
+    },
+    {
+      "id": 165,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 1"
+    },
+    {
+      "id": 166,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 0"
+    },
+    {
+      "id": 167,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 2"
+    },
+    {
+      "id": 168,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 1"
+    },
+    {
+      "id": 169,
+      "page": 20,
+      "section": "and",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 2"
+    },
+    {
+      "id": 170,
+      "page": 20,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "FIG. 14. Distributions that are sensitive to Flow II for e+. Top row: energy of brightest voxel compared to the layer energy; second row: energy of second brightest voxel compared to the layer energy; third row: diﬀerence of brightest and second brightest voxel, normalized to their sum; last row: sparsity of the showers, see text for detailed deﬁnitions."
+    },
+    {
+      "id": 171,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer0"
+    },
+    {
+      "id": 172,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer1"
+    },
+    {
+      "id": 173,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.0 0.2 0.4 E2. brightest, layer0"
+    },
+    {
+      "id": 174,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer2"
+    },
+    {
+      "id": 175,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.0 0.2 0.4 E2. brightest, layer1"
+    },
+    {
+      "id": 176,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 0"
+    },
+    {
+      "id": 177,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.0 0.2 0.4 E2. brightest, layer2"
+    },
+    {
+      "id": 178,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 1"
+    },
+    {
+      "id": 179,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 0"
+    },
+    {
+      "id": 180,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 2"
+    },
+    {
+      "id": 181,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 1"
+    },
+    {
+      "id": 182,
+      "page": 21,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 2"
+    },
+    {
+      "id": 183,
+      "page": 21,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "FIG. 15. Distributions that are sensitive to Flow II for γ+. Top row: energy of brightest voxel compared to the layer energy; second row: energy of second brightest voxel compared to the layer energy; third row: diﬀerence of brightest and second brightest voxel, normalized to their sum; last row: sparsity of the showers, see text for detailed deﬁnitions."
+    },
+    {
+      "id": 184,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer0"
+    },
+    {
+      "id": 185,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer1"
+    },
+    {
+      "id": 186,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.0 0.2 0.4 E2. brightest, layer0"
+    },
+    {
+      "id": 187,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 E1. brightest, layer2"
+    },
+    {
+      "id": 188,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.0 0.2 0.4 E2. brightest, layer1"
+    },
+    {
+      "id": 189,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 0"
+    },
+    {
+      "id": 190,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.0 0.2 0.4 E2. brightest, layer2"
+    },
+    {
+      "id": 191,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 1"
+    },
+    {
+      "id": 192,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 0"
+    },
+    {
+      "id": 193,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Eratio, 2"
+    },
+    {
+      "id": 194,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 1"
+    },
+    {
+      "id": 195,
+      "page": 22,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "0.00 0.25 0.50 0.75 1.00 Sparsity in Layer 2"
+    },
+    {
+      "id": 196,
+      "page": 22,
+      "section": "+ GEANT + CaloGAN + CaloFlow",
+      "text": "FIG. 16. Distributions that are sensitive to Flow II for π+. Top row: energy of brightest voxel compared to the layer energy; second row: energy of second brightest voxel compared to the layer energy; third row: diﬀerence of brightest and second brightest voxel, normalized to their sum; last row: sparsity of the showers, see text for detailed deﬁnitions."
+    },
+    {
+      "id": 197,
+      "page": 23,
+      "section": "e + GEANT e + CaloGAN e + CaloFlow",
+      "text": "FIG. 17. Further distributions that are sensitive to Flow II for e+, as learned by Flow II. Top and center row show the location of the deposition centroid in φ and η direction; the bottom row shows the standard deviation of the η centroid."
+    },
+    {
+      "id": 198,
+      "page": 24,
+      "section": "GEANT CaloGAN CaloFlow",
+      "text": "FIG. 18. Further distributions that are sensitive to Flow II for γ, as learned by Flow II. Top and center row show the location of the deposition centroid in φ and η direction; the bottom row shows the standard deviation of the η centroid."
+    },
+    {
+      "id": 199,
+      "page": 25,
+      "section": "+ GEANT + CaloGAN + CaloFlow",
+      "text": "FIG. 19. Further distributions that are sensitive to Flow II for π+, as learned by Flow II. Top and center row show the location of the deposition centroid in φ and η direction; the bottom row shows the standard deviation of the η centroid."
+    },
+    {
+      "id": 200,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "In much of the GAN literature (see e.g. [10]), a common metric is to train classiﬁers to distinguish between diﬀerent categories of data (e.g. e+ vs. π+), and to see if there is any diﬀerence in classiﬁer performance when real data and generated data are interchanged. For example, one might train a classiﬁer on e+ vs. π+ Geant4 images, and compare this to a classiﬁer trained on e+ vs. π+ GAN images. If the classiﬁer trained on real images performs similarly to the classiﬁer trained on generated images, then this is evidence that the generated images are approximating the real images well. One can repeat this test for diﬀerent combinations of real and generated data."
+    },
+    {
+      "id": 201,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "The ultimate test of whether pgenerated(x) = pdata(x) would be the optimal binary classiﬁer between real and generated images of the same type.7 If the generated and true probability densities are equal, and the classiﬁer is optimal, then according to the Neyman-Pearson lemma it will be no better than random guessing. Compared to evaluating various histograms, this approach has the potential advantage to look at the full 504-dimensional voxel space and all the correlations between them instead of just a multitude of one-dimensional projections."
+    },
+    {
+      "id": 202,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "Although this binary classiﬁer test between real and generated samples has been proposed before as a way to evaluate generative model performance [71], one rarely (never?) sees this more direct classiﬁer-based metric used in the GAN literature. The reason appears to be that GAN-generated images are never good enough to fool such a classiﬁer; they always have a “tell” which leads such a classiﬁer to nearly 100% accuracy [41, 71].8"
+    },
+    {
+      "id": 203,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "In this section, we will demonstrate that CaloFlow generated images are suﬃciently high ﬁdelity to fool classiﬁers trained to distinguish real from generated images of the same type. We will investigate several diﬀerent versions of the classiﬁer metric based on varying the model architecture and data representation (preprocessing): a DNN and a CNN on low-level features (LLF, meaning voxels), and a DNN on high-level features (HLF, the ones we investigated in sec. V). While voxel-based classiﬁers should give the most sensitive metric of shower quality, they may detect diﬀerences in irrelevant features, or be suboptimal due to noisy or uninformative features. This is why we also include a classiﬁer based on HLF. We expect this should give a realistic picture of the diﬀerence between the samples in the most physically-relevant space."
+    },
+    {
+      "id": 204,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "For the voxel-based classiﬁers, we consider two diﬀerent approaches to data preprocessing: (1) using the calorimeter samples as they were generated and (2) normalizing the voxels such that they sum to 1 in each calorimeter layer. The latter enhances the features in the calorimeter layers that have less energy deposition in them, making it easier for the classiﬁers to ﬁnd diﬀerences in the datasets. However, these datasets do not correspond to true showers anymore, so the results of the classiﬁers are biased.9"
+    },
+    {
+      "id": 205,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "Since the classiﬁers are not optimal, being limited by ﬁnite training data and model capacity, their performance depends on the model architecture and data preprocessing. Strictly speaking, the Neyman-Pearson classiﬁer is then best approximated by whichever model architecture and preprocessing yields the best separation of the datasets. However, we prefer to take a more holistic view of all the various classiﬁer metrics as providing diﬀerent windows into the generative model quality in the full high-dimensional phase space. For details about the classiﬁer architectures and calibration procedures, see in appendix B."
+    },
+    {
+      "id": 206,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "The output of the classiﬁers is shown in table III, where we give the result in terms of two aggregate metrics. The ﬁrst, AUC, is the area under the ROC curve of the classiﬁer. A maximally confused classiﬁer gives AUC= 0.5, whereas a perfect classiﬁer gives AUC= 1.0. The second metric, JSD, is the Jensen-Shannon divergence between the two distributions, which we deduce from the binary cross entropy of the test set at the minimum [89, 90]. The JSD is 0 if the two distributions are identical and 1 if they are disjoint."
+    },
+    {
+      "id": 207,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "In all these tests we see that a classiﬁer can distinguish Geant4 and CaloGAN samples with 100% accuracy, whereas it has a much harder time to distinguish between Geant4 and CaloFlow, indicating that CaloFlow produced a more realistic dataset. We think that this is in part due to CaloGAN not sampling the full space, as can be seen from average layer depositions that show voxels with 0 value, as well as centroid correlations that peak oﬀ-center. All these features act as “tells” for the classiﬁer."
+    },
+    {
+      "id": 208,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "In general, we observe that the CNN classiﬁer scores are lower (closer to random) than the DNN scores. This suggests that the shower images are not the best representation of the data, perhaps because the individual showers are extremely sparse and generally free of any meaningful substructure. Also, all showers start from the center of"
+    },
+    {
+      "id": 209,
+      "page": 26,
+      "section": "D. Classiﬁer metrics",
+      "text": "7 A common misconception is that this classiﬁer is the same one as in the GAN architecture. Whereas the GAN classiﬁer is only optimized for a few minibatches or epochs in order to give reasonable gradients, the classiﬁers used here are trained to convergence to approximate the ultimate, Neyman-Pearson classiﬁer. Also, the gradients of the GAN classiﬁer feed back into the training of the GAN generator, whereas here the classiﬁer metric is only trained after the ﬂow generative model is fully trained and optimized. 8 In the DCTRGAN method of [41], a classiﬁer between real and generated images was proposed — not as a judge of simulation quality, but as a reweighting function that could be applied to generated images to make them better resemble the data. However, a classiﬁer trained on calorimeter images generated from the state-of-the-art Bib-AE architecture [15, 16] had to be handicapped (by training it for a single epoch!) so that it could not achieve perfect accuracy (which would have rendered the reweighting function useless). 9 In addition to these results, we investigated the inﬂuence of working in logit space by transforming voxel values using eq. (4) and then dividing it by 10 before feeding it into the classiﬁers. As this preprocessing step artiﬁcially enhances features of dim voxels that likely do not contribute much to the physics analysis (as can be seen by comparing to the high-level classiﬁer results), we do not think that these results necessarily reﬂect physically meaningful diﬀerences between the CaloFlow (or CaloGAN) and Geant4 datasets. For completeness, we report the results of the classiﬁers with data in logit space in table V in appendix C. We also checked if applying a threshold cut of 10 keV to Geant4 and CaloGAN data (the same as in the last step of generating CaloFlow data) has an inﬂuence and we found none."
+    },
+    {
+      "id": 210,
+      "page": 27,
+      "section": "D. Classiﬁer metrics",
+      "text": "the detector, not producing many translation invariant shapes across the entire surface. Further, we observe that normalizing showers produces higher classiﬁer scores, i.e. it makes the generated showers easier to distinguish from the reference showers. This suggests that the generated showers diﬀer from the reference ones largely in the lowerenergy voxels and normalizing the showers likely ampliﬁes the role of these in the classiﬁer decision. Whether this is physically relevant for any downstream task is observable-dependent. Finally it is interesting that the high-level classiﬁer produces a lower score for positrons and photons but not for pions. Since the high-level classiﬁer uses much less information than the low-level classiﬁer, we would expect that if both were optimal, the former always has a strictly lower score than the latter, i.e. using more information can only enhance the classiﬁcation power. This is consistent with the situation for positrons and photons, but for pions it goes in the opposite direction. We can only attribute this to the suboptimality of the LLF classiﬁers for pions, whether due to ﬁnite training data or model capacity. We suspect the LLF classiﬁers for pions have a more diﬃcult time learning the (real) diﬀerences between CaloFlow and Geant4 showers because the pion showers have much higher shower-to-shower variance than photon and positron showers. The latter, being electromagnetic, come only from bremsstrahlung, pair production, ionization, Compton- and photo-eﬀect; while the former are hadronic and exhibit a much higher variety due to the various types of QCD interactions with matter."
+    },
+    {
+      "id": 211,
+      "page": 27,
+      "section": "D. Classiﬁer metrics",
+      "text": "TABLE III. AUC and JSD metrics for the classiﬁcation of Geant4 vs CaloGAN and CaloFlow showers. Classiﬁers were trained on each particle type (e+, γ, π+) separately. The results of two classiﬁers based on DNN and CNN architectures are shown; for details on the classiﬁer architectures and training, see appendix B. All entries show mean and standard deviation of 10 runs and are rounded to 3 digits. We see that the classiﬁers can distinguish Geant4 from CaloGAN showers with nearly perfect accuracy (AUC = 1.0) in all cases, whereas Geant4 vs. CaloFlow showers are much more diﬃcult for the classiﬁers to tell apart."
+    },
+    {
+      "id": 212,
+      "page": 27,
+      "section": "D. Classiﬁer metrics",
+      "text": "AUC / JSD DNN CNN vs. CaloGAN vs. CaloFlow vs. CaloGAN vs. CaloFlow unnormalized 1.000(0) / 0.995(1) 0.859(10) / 0.365(14) 0.982(8) / 0.770(54) 0.510(5) / 0.002(1) normalized 1.000(0) / 0.997(0) 0.870(2) / 0.378(5) 1.000(0) / 0.982(2) 0.806(77) / 0.269(128) high-level 1.000(0) / 0.987(1) 0.795(1) / 0.229(3) – – unnormalized 1.000(0) / 0.998(0) 0.756(48) / 0.174(68) 0.990(3) / 0.820(30) 0.511(6) / 0.001(1) normalized 1.000(0) / 0.994(1) 0.796(2) / 0.216(4) 1.000(0) / 0.991(1) 0.724(52) / 0.130(69) high-level 1.000(0) / 0.994(1) 0.727(2) / 0.131(3) – – unnormalized 1.000(0) / 0.993(0) 0.649(3) / 0.060(2) 0.984(15) / 0.813(119) 0.519(6) / 0.001(1) normalized 1.000(0) / 0.997(1) 0.755(3) / 0.153(3) 1.000(0) / 0.998(1) 0.867(6) / 0.344(15) high-level 1.000(0) / 0.997(0) 0.888(1) / 0.401(4) – –"
+    },
+    {
+      "id": 213,
+      "page": 27,
+      "section": "E. Timing benchmarks",
+      "text": "Having generated our own CaloGAN sample for this analysis, we are able to perform a head-to-head comparison of the time required for shower generation between CaloGAN and CaloFlow. Training times on a Titan V GPU are about 210 min for CaloGAN and about 22 min for CaloFlow Flow I and 82 min for CaloFlow Flow II. In table IV we show the time per shower in ms for diﬀerent batch sizes also with a Titan V GPU. For the best CaloGAN case, we see a saturation around 0.07 ms, compared to 36 ms for CaloFlow, yielding a relative factor of about 500. Since CaloGAN and CaloFlow have roughly the same size — CaloGAN has 29,726,280 trainable parameters and Flow I and Flow II of CaloFlow have a total of 37,914,414 trainable parameters — we believe that the essential diﬀerence in generation time must be due to the MAF architecture that needs to loop over the full 504-dimensional voxel space in generation. We are currently investigating [76] the possibility of switching over to a MAF-IAF pair as in Parallel Wavenet [77], which could yield a speed-up of CaloFlow of the same order of magnitude as the dimensionality of the data, bringing it in line with CaloGAN’s speed."
+    },
+    {
+      "id": 214,
+      "page": 27,
+      "section": "E. Timing benchmarks",
+      "text": "Another source of the diﬀerence between CaloGAN and CaloFlow generation speeds is indicated by the two columns listed under CaloGAN in table IV. For CaloGAN we report two diﬀerent timings: one for generating a single batch of size “batch size” and one for generating a total of 100,000 events. The diﬀerence in those two timings arises from Keras-Tensorflow building the graph for the prediction at the beginning of the function call and then reusing it for subsequent batches. CaloFlow is using the pytorch [91] based package nflows [73] and batches are handled using a simple for-loop. We therefore observe no timing diﬀerence for CaloFlow when requesting more samples than the batch size. So it is possible that we could further speed up the per-event generation time of CaloFlow by implementing it in Keras-Tensorflow and requesting more events than the batch size."
+    },
+    {
+      "id": 215,
+      "page": 28,
+      "section": "E. Timing benchmarks",
+      "text": "TABLE IV. Generation time of a single calorimeter shower in ms. Times were obtained on a Titan V GPU. Geant4 needs 1772 ms per shower [10]. Note that CaloGAN is based on Keras-Tensorflow and CaloFlow is based on pytorch. All times are in ms."
+    },
+    {
+      "id": 216,
+      "page": 28,
+      "section": "E. Timing benchmarks",
+      "text": "CaloGAN CaloFlow batch size batch size requested 100k requested"
+    },
+    {
+      "id": 217,
+      "page": 28,
+      "section": "VI. CONCLUSIONS",
+      "text": "In this work, we have demonstrated, for the ﬁrst time, that generative modeling with normalizing ﬂows is capable of reproducing the sparse and very high dimensional dataset that corresponds to Geant4 calorimeter showers. With both qualitative comparisons of individual and average images, as well as more quantitative comparisons of distributions, we see that CaloFlow reproduces Geant4 with extremely high ﬁdelity. Even more impressively, we demonstrated that a binary classiﬁer trained on CaloFlow vs. Geant4 fails to achieve anything close to 100% accuracy, indicating that the CaloFlow images approximate the distribution of Geant4 images to a very high precision. This is the ﬁrst time any generative model has passed this stringent test."
+    },
+    {
+      "id": 218,
+      "page": 28,
+      "section": "VI. CONCLUSIONS",
+      "text": "For our proof of concept, we have relied heavily on the setup of the CaloGAN. This is a simpliﬁed 3-layer calorimeter, but still much higher dimension that previous applications of normalizing ﬂows in HEP. Further work is needed for realistic setups such as the actual ATLAS/CMS detector or future high-granularity detectors for HL-LHC and ILD, as well as taking into account the incoming angle of the particle and other real-world complications."
+    },
+    {
+      "id": 219,
+      "page": 28,
+      "section": "VI. CONCLUSIONS",
+      "text": "For our normalizing ﬂow we combined the RQS transformation with the MADE block to maximize the expressivity of the density estimator. It would be interesting to explore other density estimators which could have their individual pros and cons. For instance, the MAF, while more expressive than coupling layers, is also considerably slower at sampling. The MAF does have a cousin called the IAF [75] for which the opposite is true (fast to sample, slow to density estimate) but the implementation in nflows was not memory-eﬃcient enough to be able to train on the full 504-dimensional dataset. We are currently investigating whether alternative implementations of the IAF could overcome these memory limitations, or whether it is possible to jointly train a MAF-IAF pair as in Parallel Wavenet [77]. This could result in another considerable speedup to CaloFlow, we expect roughly scaling like the dimensionality of the dataset, so a factor of ∼500 in this case. Interestingly, according to the timing benchmarks in Section V E, such a speedup would lead to CaloFlow being as fast as the GAN."
+    },
+    {
+      "id": 220,
+      "page": 28,
+      "section": "VI. CONCLUSIONS",
+      "text": "To better and more explicitly enforce energy conversation, we invented a 2-step ﬂow, where in the ﬁrst step we generate the energies deposited in each layer, and in the second step we learn the shower shapes of each layer. This improved the performance of CaloFlow greatly and should also have applications to other generative modeling approaches, e.g. GANs. Another interesting future direction would be to train ﬂows that explicitly conserve energy by learning the energy-conserving manifold directly [86]. This would be an alternative to the 2-step ﬂow conﬁguration considered in this work. Additional reﬁnements of the latent space, as they were discussed recently in [92] provide an additional avenue for improvements. Finally, given the success in the “ultimate” classiﬁer test demonstrated here, it is likely that the DCTRGAN method of [41] — which essentially takes the output of said classiﬁer and uses it to reweight the generated events — could be fruitfully applied to further reﬁne CaloFlow starting from the low-level calorimeter images."
+    },
+    {
+      "id": 221,
+      "page": 28,
+      "section": "VI. CONCLUSIONS",
+      "text": "We believe normalizing ﬂows oﬀer a powerful and fresh approach to generative modeling at the LHC. Compared to GANs, they have many advantages, including: explicit, tractable likelihoods; more stable and convergent training and principled model selection (based on the negative log-likelihood). While more work comparing CaloFlow to more state-of-the-art GANs (eg WGAN-GP) needs to be done, we believe this proof of concept (especially the “ultimate classiﬁer” test) is a very promising start."
+    },
+    {
+      "id": 222,
+      "page": 29,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "We are grateful to G. Kasieczka, B. Nachman, and T. Plehn for helpful discussions and comments on the draft. We also thank B. Nachman for his assistance with reproducing the CaloGAN results using their github. This work was supported by DOE grant DOE-SC0010008."
+    },
+    {
+      "id": 223,
+      "page": 29,
+      "section": "ACKNOWLEDGMENTS",
+      "text": "In this work, we used the NumPy 1.16.4 [93], Matplotlib 3.1.0 [94], pandas 0.24.2 [95], sklearn 0.21.2 [96], h5py 2.9.0 [97], pytorch 1.7.1 [91], and nflows 0.14 [73] software packages. Our code is available at https://gitlab.com/claudius-krause/caloflow."
+    },
+    {
+      "id": 224,
+      "page": 29,
+      "section": "Appendix A: More on normalizing ﬂows",
+      "text": "The essential trick that NFs use to parametrize invertible mappings with tractable Jacobians is the autoregressive transformation."
+    },
+    {
+      "id": 225,
+      "page": 29,
+      "section": "Appendix A: More on normalizing ﬂows",
+      "text": "We start with a 1d invertible transformation z = f(x; κa, . . . ) where κa = κ0, κ1, . . . are the parameters of the transformation. Popular examples of such transformations include the aﬃne transformation f(x;⃗κ) = κ0x + κ1 and the rational quadratic spline family of transformations (as described in the main text). How to generalize this to multiple dimensions while maintaining invertibility? Making the coeﬃcients functions of x would enable the forward mapping but not the inverse mapping in general. What simultaneously enables both directions and makes the Jacobian tractable is to assume the κa are functions of only the previous coordinates, i.e."
+    },
+    {
+      "id": 226,
+      "page": 29,
+      "section": "Appendix A: More on normalizing ﬂows",
+      "text": "where i = 1, . . . , d runs over the dimensions of the feature space. Now x1 →z1 can be trivially inverted (κ1a are just constants), and the remainder of the inverse transformations can be built up recursively. Furthermore, the Jacobian of the transformation is lower triangular, so the determinant can be calculated as a simple product of the diagonals (d operations), instead of the O(d3) operations required for a general d × d matrix."
+    },
+    {
+      "id": 227,
+      "page": 29,
+      "section": "Appendix A: More on normalizing ﬂows",
+      "text": "The transformation parameters can be parametrized with neural networks, and the most general autoregressive structure can be enforced by multiplying all weights with appropriate binary masks. The result is called a MADE block (from “Masked Autoencoder for Distribution Estimation” [69]). To ensure that all correlations between the variables are learned properly, the order of the variables is permuted in between diﬀerent blocks."
+    },
+    {
+      "id": 228,
+      "page": 29,
+      "section": "Appendix A: More on normalizing ﬂows",
+      "text": "A special case of the general autoregressive transformation is the so-called “coupling layer”, ﬁrst introduced as part of the “real NVP” ﬂow in [53]. In the coupling layer approach, one ﬁrst splits the entire set of coordinates {x1, . . . , xd} into two subsets A = {x1, . . . , xd′} and B = {xd′+1, . . . , xd} for some 1 ≤d′ < d. Transformations of coordinates of set B are then given by parameters that depend on the coordinates of set A, while the elements of set A are not transformed."
+    },
+    {
+      "id": 229,
+      "page": 29,
+      "section": "Appendix A: More on normalizing ﬂows",
+      "text": "Conditional labels can be incorporated easily in both the MADE and the coupling layer architectures by feeding this information into the networks that predict the transformation parameters. In case of a MADE architecture, the connections from the conditional information are not masked."
+    },
+    {
+      "id": 230,
+      "page": 29,
+      "section": "Appendix B: Classiﬁer Architectures",
+      "text": "To quantitativly asses the quality of our generated samples, we train a set of classiﬁers to distinguish CaloFlow samples from the Geant4 training set and compare the results to the same set of classiﬁers trained to distinguish CaloGAN from Geant4 data. We use the following three classiﬁer architectures:"
+    },
+    {
+      "id": 231,
+      "page": 29,
+      "section": "Appendix B: Classiﬁer Architectures",
+      "text": "The ﬁrst classiﬁer architecture is a simple DNN which takes the 504 voxel values (normalized or not), the incident energy Einc encoded via eq. (6), and the 3 layer energies Ei encoded via eq. (7) as input. It has 3 hidden layers with 512 neurons each that use LeakyReLU (with negative slope 0.01) activation functions, the last layer has a single neuron with sigmoid activation. This setup has 786,433 trainable parameters."
+    },
+    {
+      "id": 232,
+      "page": 29,
+      "section": "Appendix B: Classiﬁer Architectures",
+      "text": "The second classiﬁer uses the same DNN architecture as the ﬁrst, only the input layer is modiﬁed to now take 41 high-level features as input, leading to 547,329 trainable parameters. The input features are the ones we deﬁned in sections V B and V C, and showed in ﬁgs. 11–19. We extended the list by including the voxel energy distributions of the third to ﬁfth brightest voxel of each calorimeter layer. Based on the preprocessing, we can group the features in two groups. The ﬁrst group consists of E0, E1, E2, ˆEtot, E0/ ˆEtot, E1/ ˆEtot, E2/ ˆEtot, ld, σ0, σ1, and σ2. All of them are transformed by log10 before giving them to the DNN, together with the incident energy Einc encoded via eq. (6). The second group consists of sd, σsd, the energy of the brightest ﬁve voxels in each layer, Eratio,0, Eratio,1, Eratio,2, the sparsities of each layer, and the centroids in φ and η direction of each layer. We multiply the energies of the brightest voxels by 10 and divide the centroid locations by 100 to have all numbers of O(1) before we give them directly to the DNN."
+    },
+    {
+      "id": 233,
+      "page": 30,
+      "section": "Appendix B: Classiﬁer Architectures",
+      "text": "The third classiﬁer is a CNN-based architecture derived from the top-tagging study of [98]. It consists of a series of: two convolutional (with 128 and 64 channels respectively), one maxpooling, two convolutional (with 64 channels each), and one maxpooling layer per calorimeter layer. Kernel sizes and padding of the ﬁrst 2 convolutional layers are chosen such that the images have shape (nbatch, 64, 6, 6) after the ﬁrst maxpooling layer. Kernel sizes and padding of the second two convolutional layers are chosen to keep the shape the same. The last maxpooling layer transfors the images to (nbatch, 64, 4, 4). The output of the three calorimeter layers is the ﬂattened and concatenated to a single vector, together with the incident energy Einc encoded via eq. (6), and the 3 layer energies Ei encoded via eq. (7) to a total size of 772. This vector is fed into a dense NN with 2 hidden layers of 512 neurons each and an one-dimensional output layer. Activations throughout the whole network are LeakyReLU-functions (with negative slope 0.01), except for the very last layer, where we use a Sigmoid. This architecture has a total of 1,262,913 trainable parameters. To save training time, the CNN is trained with single precision."
+    },
+    {
+      "id": 234,
+      "page": 30,
+      "section": "Appendix B: Classiﬁer Architectures",
+      "text": "The dataset containing 100,000 “real” and 100,000 “fake” showers was split into the training set of 120,000 samples, a test set of 40,000 samples, and a validation set of 40,000 samples. The classiﬁers are trained for 150 epochs with a mini-batch size of 1000 samples using the ADAM [83] optimizer and an initial learning rate of 10−3. We use the epoch with the highest accuracy of the validation set for the subsequent evaluation of the AUC and the JSD on the test set. Before evaluating the classiﬁer scores, we calibrate the classiﬁer using isotonic regression [99] of sklearn [96] based on the validation dataset."
+    },
+    {
+      "id": 235,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Table V shows the results of the classiﬁer runs when the data is preprocessed to logit space. The results are similar than in the case without this preprocessing step: The CaloGAN sample can always be distiguished from the Geant4 sample, but the CaloFlow sample is much harder to separate from Geant4 data."
+    },
+    {
+      "id": 236,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "TABLE V. AUCs/JSD for the classiﬁcation of e+, γ, and π+ showers from GEANT vs CaloGAN and CaloFlow. All entries show mean and standard deviation of 10 runs and are rounded to 3 digits. Data is preprocessed to logit space."
+    },
+    {
+      "id": 237,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "AUC / JSD DNN CNN vs. CaloGAN vs. CaloFlow vs. CaloGAN vs. CaloFlow e+ unnormalized 1.000(0) / 0.999(1) 0.668(3) / 0.064(2) 1.000(0) / 0.999(1) 0.737(150) / 0.207(186) normalized 1.000(0) / 0.999(0) 0.675(3) / 0.072(2) 1.000(0) / 0.999(1) 0.879(74) / 0.405(155) unnormalized 1.000(0) / 0.997(0) 0.674(5) / 0.070(4) 1.000(0) / 0.999(1) 0.742(110) / 0.174(122) normalized 1.000(0) / 0.999(0) 0.678(6) / 0.072(5) 1.000(0) / 0.998(1) 0.885(21) / 0.389(51) π+ unnormalized 1.000(0) / 0.999(0) 0.669(3) / 0.072(3) 1.000(0) / 1.000(0) 0.891(19) / 0.409(48) normalized 1.000(0) / 0.999(0) 0.755(10) / 0.165(12) 1.000(0) / 1.000(0) 0.958(4) / 0.625(18)"
+    },
+    {
+      "id": 238,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "[1] HEP Software Foundation collaboration, HEP Software Foundation Community White Paper Working Group -"
+    },
+    {
+      "id": 239,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Detector Simulation, 1803.04165. [2] HEP Software Foundation collaboration, HL-LHC Computing Review: Common Tools and Community Software, in"
+    },
+    {
+      "id": 240,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "2022 Snowmass Summer Study, P. Canal et al., eds., 8, 2020, DOI [2008.13636]. [3] P. Calaﬁura, J. Catmore, D. Costanzo and A. Di Girolamo, Atlas hl-lhc computing conceptual design report, Tech. Rep."
+    },
+    {
+      "id": 241,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "CERN-LHCC-2020-015, CERN, Geneva (Sep, 2020). [4] CMS Collaboration collaboration, CMS Oﬄine and Computing Public Results, Tech. Rep. Approved HL-LHC resource projections, CERN, Geneva (May, 2020). [5] ATLAS Collaboration collaboration, The new Fast Calorimeter Simulation in ATLAS, Tech. Rep."
+    },
+    {
+      "id": 242,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "ATL-SOFT-PUB-2018-002, CERN, Geneva (Jul, 2018). [6] GEANT4 collaboration, GEANT4–a simulation toolkit, Nucl. Instrum. Meth. A 506 (2003) 250. [7] J. Allison, K. Amako, J. Apostolakis, H. Araujo, P. Arce Dubois, M. Asai et al., Geant4 developments and applications,"
+    },
+    {
+      "id": 243,
+      "page": 30,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "IEEE Transactions on Nuclear Science 53 (2006) 270."
+    },
+    {
+      "id": 244,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "[8] J. Allison, K. Amako, J. Apostolakis, P. Arce, M. Asai, T. Aso et al., Recent developments in geant4, Nuclear"
+    },
+    {
+      "id": 245,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Instruments and Methods in Physics Research Section A: Accelerators, Spectrometers, Detectors and Associated Equipment 835 (2016) 186. [9] M. Paganini, L. de Oliveira and B. Nachman, Accelerating Science with Generative Adversarial Networks: An Application to 3D Particle Showers in Multilayer Calorimeters, Phys. Rev. Lett. 120 (2018) 042003 [1705.02355]. [10] M. Paganini, L. de Oliveira and B. Nachman, CaloGAN : Simulating 3D high energy particle showers in multilayer electromagnetic calorimeters with generative adversarial networks, Phys. Rev. D 97 (2018) 014021 [1712.10321]. [11] M. Erdmann, L. Geiger, J. Glombitza and D. Schmidt, Generating and reﬁning particle detector simulations using the"
+    },
+    {
+      "id": 246,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Wasserstein distance in adversarial networks, Comput. Softw. Big Sci. 2 (2018) 4 [1802.03325]. [12] M. Erdmann, J. Glombitza and T. Quast, Precise simulation of electromagnetic calorimeter showers using a Wasserstein"
+    },
+    {
+      "id": 247,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Generative Adversarial Network, Comput. Softw. Big Sci. 3 (2019) 4 [1807.01954]. [13] ATLAS Collaboration collaboration, Deep generative models for fast shower simulation in ATLAS, Tech. Rep."
+    },
+    {
+      "id": 248,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "ATL-SOFT-PUB-2018-001, CERN, Geneva (Jul, 2018). [14] D. Belayneh et al., Calorimetry with deep learning: particle simulation and reconstruction for collider physics, Eur. Phys."
+    },
+    {
+      "id": 249,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "J. C 80 (2020) 688 [1912.06794]. [15] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol et al., Getting High: High Fidelity Simulation of High Granularity Calorimeters with High Speed, Comput. Softw. Big Sci. 5 (2021) 13 [2005.05334]. [16] E. Buhmann, S. Diefenbacher, E. Eren, F. Gaede, G. Kasieczka, A. Korol et al., Decoding Photons: Physics in the Latent"
+    },
+    {
+      "id": 250,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Space of a BIB-AE Generative Network, 2102.12491. [17] ATLAS Collaboration collaboration, Fast simulation of the ATLAS calorimeter system with Generative Adversarial"
+    },
+    {
+      "id": 251,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Networks, Tech. Rep. ATL-SOFT-PUB-2020-006, CERN, Geneva (Nov, 2020). [18] I.J. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair et al., Generative Adversarial Networks,"
+    },
+    {
+      "id": 252,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "1406.2661. [19] S. Voloshynovskiy, M. Kondah, S. Rezaeifar, O. Taran, T. Holotyak and D.J. Rezende, Information bottleneck through variational glasses, CoRR abs/1912.00830 (2019) [1912.00830]. [20] HEP ML Community, “A Living Review of Machine Learning for Particle Physics.” [21] L. de Oliveira, M. Paganini and B. Nachman, Learning Particle Physics by Example: Location-Aware Generative"
+    },
+    {
+      "id": 253,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Adversarial Networks for Physics Synthesis, 1701.05927. [22] S. Alonso-Monsalve and L.H. Whitehead, Image-based model parameter optimization using Model-Assisted Generative"
+    },
+    {
+      "id": 254,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Adversarial Networks, 1812.00879. [23] A. Butter, T. Plehn and R. Winterhalder, How to GAN Event Subtraction, 1912.08824. [24] J. Arjona Martinez, T.Q. Nguyen, M. Pierini, M. Spiropulu and J.-R. Vlimant, Particle Generative Adversarial Networks for full-event simulation at the LHC and their application to pileup description, ACAT 2019 (2019) [1912.02748]. [25] M. Bellagente, A. Butter, G. Kasieczka, T. Plehn and R. Winterhalder, How to GAN away Detector Eﬀects, 1912.00477. [26] SHiP collaboration, Fast simulation of muons produced at the SHiP experiment using Generative Adversarial Networks,"
+    },
+    {
+      "id": 255,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "1909.04451. [27] S. Carrazza and F.A. Dreyer, Lund jet images from generative and cycle-consistent adversarial networks, Eur. Phys. J."
+    },
+    {
+      "id": 256,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "C79 (2019) 979 [1909.01359]. [28] A. Butter, T. Plehn and R. Winterhalder, How to GAN LHC Events, SciPost Phys. 7 (2019) 075 [1907.03764]. [29] J. Lin, W. Bhimji and B. Nachman, Machine Learning Templates for QCD Factorization in the Search for Physics"
+    },
+    {
+      "id": 257,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Beyond the Standard Model, JHEP 05 (2019) 181 [1903.02556]. [30] R. Di Sipio, M. Faucci Giannelli, S. Ketabchi Haghighat and S. Palazzo, DijetGAN: A Generative-Adversarial Network"
+    },
+    {
+      "id": 258,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Approach for the Simulation of QCD Dijet Events at the LHC, 1903.02433. [31] B. Hashemi, N. Amin, K. Datta, D. Olivito and M. Pierini, LHC analysis-speciﬁc datasets with Generative Adversarial"
+    },
+    {
+      "id": 259,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Networks, 1901.05282. [32] V. Chekalina, E. Orlova, F. Ratnikov, D. Ulyanov, A. Ustyuzhanin and E. Zakharov, Generative Models for Fast"
+    },
+    {
+      "id": 260,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Calorimeter Simulation.LHCb case, CHEP 2018 (2018) [1812.01319]. [33] K. Zhou, G. Endrodi, L.-G. Pang and H. Stocker, Regressive and generative neural networks for scalar ﬁeld theory, Phys."
+    },
+    {
+      "id": 261,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Rev. D100 (2019) 011501 [1810.12879]. [34] K. Datta, D. Kar and D. Roy, Unfolding with Generative Adversarial Networks, 1806.00433. [35] P. Musella and F. Pandolﬁ, Fast and Accurate Simulation of Particle Detectors Using Generative Adversarial Networks,"
+    },
+    {
+      "id": 262,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Comput. Softw. Big Sci. 2 (2018) 8 [1805.00850]. [36] D. Derkach, N. Kazeev, F. Ratnikov, A. Ustyuzhanin and A. Volokhova, RICH 2018, 1903.11788. [37] H. Erbin and S. Krippendorf, GANs for generating EFT models, 1809.02612. [38] J.M. Urban and J.M. Pawlowski, Reducing Autocorrelation Times in Lattice Simulations with Generative Adversarial"
+    },
+    {
+      "id": 263,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Networks, 1811.03533. [39] L. de Oliveira, M. Paganini and B. Nachman, Controlling Physical Attributes in GAN-Accelerated Simulation of"
+    },
+    {
+      "id": 264,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Electromagnetic Calorimeters, J. Phys. Conf. Ser. 1085 (2018) 042017 [1711.08813]. [40] Y. Alanazi et al., AI-based Monte Carlo event generator for electron-proton scattering, 2008.03151. [41] S. Diefenbacher, E. Eren, G. Kasieczka, A. Korol, B. Nachman and D. Shih, DCTRGAN: Improving the Precision of"
+    },
+    {
+      "id": 265,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Generative Models with Reweighting, JINST 15 (2020) P11004 [2009.03796]. [42] A. Butter, S. Diefenbacher, G. Kasieczka, B. Nachman and T. Plehn, GANplifying Event Samples, 2008.06545. [43] R. Kansal, J. Duarte, B. Orzari, T. Tomei, M. Pierini, M. Touranakou et al., Graph Generative Adversarial Networks for"
+    },
+    {
+      "id": 266,
+      "page": 31,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Sparse Data Generation in High Energy Physics, 34th Conference on Neural Information Processing Systems (2020)"
+    },
+    {
+      "id": 267,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "[2012.00173]. [44] A. Maevskiy, F. Ratnikov, A. Zinchenko and V. Riabov, Simulating the Time Projection Chamber responses at the MPD detector using Generative Adversarial Networks, 2012.04595. [45] Y.S. Lai, D. Neill, M. P losko´n and F. Ringer, Explainable machine learning of the underlying physics of high-energy particle collisions, 2012.06582. [46] S. Choi and J.H. Lim, A Data-driven Event Generator for Hadron Colliders using Wasserstein Generative Adversarial"
+    },
+    {
+      "id": 268,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Network, 2102.11524. [47] F. Rehm, S. Vallecorsa, V. Saletore, H. Pabst, A. Chaibi, V. Codreanu et al., Reduced Precision Strategies for Deep"
+    },
+    {
+      "id": 269,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Learning: A High Energy Physics Generative Adversarial Network Use Case, 2103.10142. [48] S. Carrazza, J. Cruz-Martinez and T.R. Rabemananjara, Compressing PDF sets using generative adversarial networks,"
+    },
+    {
+      "id": 270,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "2104.04535. [49] T. Lebese, B. Mellado and X. Ruan, The use of Generative Adversarial Networks to characterise new physics in multi-lepton ﬁnal states at the LHC, 2105.14933. [50] D. Saxena and J. Cao, Generative Adversarial Networks (GANs): Challenges, Solutions, and Future Directions, arXiv e-prints (2020) arXiv:2005.00065 [2005.00065]. [51] I. Kobyzev, S.J.D. Prince and M.A. Brubaker, Normalizing Flows: An Introduction and Review of Current Methods, arXiv e-prints (2019) arXiv:1908.09257 [1908.09257]. [52] G. Papamakarios, E. Nalisnick, D. Jimenez Rezende, S. Mohamed and B. Lakshminarayanan, Normalizing Flows for"
+    },
+    {
+      "id": 271,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Probabilistic Modeling and Inference, arXiv e-prints (2019) arXiv:1912.02762 [1912.02762]. [53] L. Dinh, J. Sohl-Dickstein and S. Bengio, Density estimation using Real NVP, arXiv e-prints (2016) arXiv:1605.08803"
+    },
+    {
+      "id": 272,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "[1605.08803]. [54] G. Papamakarios, T. Pavlakou and I. Murray, Masked Autoregressive Flow for Density Estimation, arXiv e-prints (2017) arXiv:1705.07057 [1705.07057]. [55] C. Gao, J. Isaacson and C. Krause, i-ﬂow: High-dimensional Integration and Sampling with Normalizing Flows, Mach."
+    },
+    {
+      "id": 273,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Learn. Sci. Tech. 1 (2020) 045023 [2001.05486]. [56] C. Gao, S. H¨oche, J. Isaacson, C. Krause and H. Schulz, Event Generation with Normalizing Flows, Phys. Rev. D 101"
+    },
+    {
+      "id": 274,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "(2020) 076002 [2001.10028]. [57] E. Bothmann, T. Janßen, M. Knobbe, T. Schmale and S. Schumann, Exploring phase space with Neural Importance"
+    },
+    {
+      "id": 275,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Sampling, SciPost Phys. 8 (2020) 069 [2001.05478]. [58] S. Pina-Otey, V. Gaitan, F. S´anchez and T. Lux, Exhaustive neural importance sampling applied to Monte Carlo event generation, Phys. Rev. D 102 (2020) 013003 [2005.12719]. [59] B. Stienen and R. Verheyen, Phase Space Sampling and Inference from Weighted Events with Autoregressive Flows,"
+    },
+    {
+      "id": 276,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "SciPost Phys. 10 (2021) 038 [2011.13445]. [60] M. Bellagente, M. Haußmann, M. Luchmann and T. Plehn, Understanding Event-Generation Networks via Uncertainties,"
+    },
+    {
+      "id": 277,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "2104.04543. [61] M. Bellagente, A. Butter, G. Kasieczka, T. Plehn, A. Rousselot, R. Winterhalder et al., Invertible Networks or Partons to"
+    },
+    {
+      "id": 278,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Detector and Back Again, SciPost Phys. 9 (2020) 074 [2006.06685]. [62] S. Choi, J. Lim and H. Oh, Data-driven Estimation of Background Distribution through Neural Autoregressive Flows,"
+    },
+    {
+      "id": 279,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "2008.03636. [63] S. Bieringer, A. Butter, T. Heimel, S. H¨oche, U. K¨othe, T. Plehn et al., Measuring QCD Splittings with Invertible"
+    },
+    {
+      "id": 280,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Networks, SciPost Phys. 10 (2021) 126 [2012.09873]. [64] B. Nachman and D. Shih, Anomaly Detection with Density Estimation, Phys. Rev. D 101 (2020) 075042 [2001.04990]. [65] M. Arjovsky, S. Chintala and L. Bottou, Wasserstein GAN, arXiv e-prints (2017) arXiv:1701.07875 [1701.07875]. [66] I. Gulrajani, F. Ahmed, M. Arjovsky, V. Dumoulin and A. Courville, Improved Training of Wasserstein GANs, arXiv e-prints (2017) arXiv:1704.00028 [1704.00028]. [67] B. Nachman, L. de Oliveira and M. Paganini, Electromagnetic calorimeter shower images, Mendeley Data (2017) . [68] M. Paganini, L. de Oliveira and B. Nachman, hep-lbdl/calogan: Calogan generation, training, and analysis code, Zenodo"
+    },
+    {
+      "id": 281,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "(2017) . [69] M. Germain, K. Gregor, I. Murray and H. Larochelle, MADE: Masked Autoencoder for Distribution Estimation, arXiv e-prints (2015) arXiv:1502.03509 [1502.03509]. [70] C. Durkan, A. Bekasov, I. Murray and G. Papamakarios, Neural spline ﬂows, in Advances in Neural Information"
+    },
+    {
+      "id": 282,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Processing Systems, H. Wallach, H. Larochelle, A. Beygelzimer, F. Alch´e-Buc, E. Fox and R. Garnett, eds., vol. 32, Curran Associates, Inc., 2019, https://proceedings.neurips.cc/paper/2019/ﬁle/7ac71d433f282034e088473244df8c02-Paper.pdf [1906.04032]. [71] D. Lopez-Paz and M. Oquab, Revisiting classiﬁer two-sample tests, 1610.06545. [72] D. Jimenez Rezende and S. Mohamed, Variational Inference with Normalizing Flows, arXiv e-prints (2015) arXiv:1505.05770 [1505.05770]. [73] C. Durkan, A. Bekasov, I. Murray and G. Papamakarios, nﬂows: normalizing ﬂows in PyTorch, Nov., 2020."
+    },
+    {
+      "id": 283,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "10.5281/zenodo.4296287. [74] L. Dinh, D. Krueger and Y. Bengio, NICE: Non-linear Independent Components Estimation, arXiv e-prints (2014) arXiv:1410.8516 [1410.8516]. [75] D.P. Kingma, T. Salimans, R. Jozefowicz, X. Chen, I. Sutskever and M. Welling, Improving Variational Inference with"
+    },
+    {
+      "id": 284,
+      "page": 32,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Inverse Autoregressive Flow, arXiv e-prints (2016) arXiv:1606.04934 [1606.04934]."
+    },
+    {
+      "id": 285,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "[76] C. Krause and D. Shih, CaloFlow II: Even Faster and Still Accurate Generation of Calorimeter Showers with"
+    },
+    {
+      "id": 286,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Normalizing Flows, 2110.11377. [77] A. van den Oord, Y. Li, I. Babuschkin, K. Simonyan, O. Vinyals, K. Kavukcuoglu et al., Parallel WaveNet: Fast"
+    },
+    {
+      "id": 287,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "High-Fidelity Speech Synthesis, arXiv e-prints (2017) arXiv:1711.10433 [1711.10433]. [78] J.A. GREGORY and R. DELBOURGO, Piecewise Rational Quadratic Interpolation to Monotonic Data, IMA Journal of"
+    },
+    {
+      "id": 288,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Numerical Analysis 2 (1982) 123 [https://academic.oup.com/imajna/article-pdf/2/2/123/2267745/2-2-123.pdf]. [79] C. Krause and D. Shih, Electromagnetic calorimeter shower images of caloﬂow, zenodo (2021) . [80] M. Rosenblatt, Remarks on Some Nonparametric Estimates of a Density Function, The Annals of Mathematical"
+    },
+    {
+      "id": 289,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Statistics 27 (1956) 832 . [81] E. Parzen, On Estimation of a Probability Density Function and Mode, The Annals of Mathematical Statistics 33 (1962)"
+    },
+    {
+      "id": 290,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "1065 . [82] C.M. Bishop, “Mixture density networks.” 1994. [83] D.P. Kingma and J. Ba, Adam: A method for stochastic optimization, 2014. [84] G.E. Hinton, N. Srivastava, A. Krizhevsky, I. Sutskever and R.R. Salakhutdinov, Improving neural networks by preventing co-adaptation of feature detectors, arXiv e-prints (2012) arXiv:1207.0580 [1207.0580]. [85] N. Srivastava, G. Hinton, A. Krizhevsky, I. Sutskever and R. Salakhutdinov, Dropout: A simple way to prevent neural networks from overﬁtting, Journal of Machine Learning Research 15 (2014) 1929. [86] J. Brehmer and K. Cranmer, Flows for simultaneous manifold learning and density estimation, 2003.13913. [87] M. Abadi, A. Agarwal, P. Barham, E. Brevdo, Z. Chen, C. Citro et al., TensorFlow: Large-scale machine learning on heterogeneous systems, 2015. [88] F. Chollet et al., “Keras.” https://keras.io, 2015. [89] X. Nguyen, M.J. Wainwright and M.I. Jordan, On surrogate loss functions and f-divergences, arXiv Mathematics e-prints (2005) math/0510521 [math/0510521]. [90] B. Nachman and J. Thaler, E Pluribus Unum Ex Machina: Learning from Many Collider Events at Once, 2101.07263. [91] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury, G. Chanan et al., Pytorch: An imperative style, high-performance deep learning library, in Advances in Neural Information Processing Systems 32, H. Wallach, H. Larochelle, A. Beygelzimer, F. Alch´e-Buc, E. Fox and R. Garnett, eds., pp. 8024–8035, Curran Associates, Inc. (2019), http://papers.neurips.cc/paper/9015-pytorch-an-imperative-style-high-performance-deep-learning-library.pdf. [92] R. Winterhalder, M. Bellagente and B. Nachman, Latent Space Reﬁnement for Deep Generative Models, 2106.00792. [93] C.R. Harris, K.J. Millman, S.J. van der Walt, R. Gommers, P. Virtanen, D. Cournapeau et al., Array programming with"
+    },
+    {
+      "id": 291,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "NumPy, Nature 585 (2020) 357. [94] J.D. Hunter, Matplotlib: A 2d graphics environment, Computing in Science Engineering 9 (2007) 90. [95] T. pandas development team, pandas-dev/pandas: Pandas, Feb., 2020. 10.5281/zenodo.3509134. [96] F. Pedregosa, G. Varoquaux, A. Gramfort, V. Michel, B. Thirion, O. Grisel et al., Scikit-learn: Machine learning in"
+    },
+    {
+      "id": 292,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "Python, Journal of Machine Learning Research 12 (2011) 2825. [97] A. Collette, Python and HDF5, O’Reilly (2013). [98] S. Macaluso and D. Shih, Pulling Out All the Tops with Computer Vision and Deep Learning, JHEP 10 (2018) 121"
+    },
+    {
+      "id": 293,
+      "page": 33,
+      "section": "Appendix C: Classiﬁers in logit space",
+      "text": "[1803.00107]. [99] C. Guo, G. Pleiss, Y. Sun and K.Q. Weinberger, On Calibration of Modern Neural Networks, arXiv e-prints (2017) arXiv:1706.04599 [1706.04599]."
+    }
+  ],
+  "skipped_pages": []
+}
