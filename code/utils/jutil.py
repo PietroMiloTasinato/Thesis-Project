@@ -137,7 +137,7 @@ def _read_page(page: pymupdf.Page, number: int) -> _Page:
     return result
 
 
-def _body_font_size(pages: list[_Page]) -> float:
+def _body_font_size(pages: list[_Page]) -> float: 
     counter: Counter = Counter()
     for p in pages:
         for b in p.blocks:
