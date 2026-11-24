@@ -7,7 +7,7 @@ from knowledge.store import KnowledgeStore
 from models.CustomAgent import OllamaClient, HOST
 from pipelines.research_pipeline import ResearchPipeline
 from pipelines.review_pipeline import ReviewPipeline
-from utils import pdf_to_json as jutils
+from utils import jutil
 
 def fetch_resources(paper: dict, knowledge_store: KnowledgeStore):
     references = s2.get_relevant_references(paper)
@@ -58,7 +58,7 @@ def reviewer_run(paper_files : list, client: OllamaClient):
 
     for paper_entry in tqdm(papers_files):
         
-        context = jutils.json_to_sections(f"p{paper_entry}.json")
+        context = jutil.json_to_sections(f"p{paper_entry}.json")
         
         #context = {'paper': {key: paper.get(key) for key in ('title', 'abstract')}}
         
