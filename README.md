@@ -5,7 +5,7 @@ Project for the Master Thesis on Computer Engineering with University of Bologna
 # Project Structure: 
 
 The project starts from the Research Agent developed by [Jinheon Baek, Sujay Kumar Jauhar, Silviu Cucerzan, and Sung Ju Hwang](https://github.com/JinheonBaek/ResearchAgent/tree/main)
-
+- Local_papers —location to use when we want to analyze a paper
 - code/
 	- main.py — entrypoint to run the end-to-end pipeline
 	- knowledge/
