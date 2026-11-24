@@ -58,6 +58,7 @@ def reviewer_run(paper_files : list, client: OllamaClient):
 
     for paper_entry in tqdm(papers_files):
         
+        jutil.pdf_to_json("./Local_papers/p{paper_entry}.pdf", "./Local_papers/p{paper_entry}.json")
         context = jutil.json_to_sections(f"p{paper_entry}.json")
         
         #context = {'paper': {key: paper.get(key) for key in ('title', 'abstract')}}
