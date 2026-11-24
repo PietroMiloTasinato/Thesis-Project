@@ -24,7 +24,7 @@ The project starts from the Research Agent developed by [Jinheon Baek, Sujay Kum
 		- s2.py — Semantic Scholar API helpers (papers, references, embeddings)
 		- data_io.py — JSONL loading and ID utilities
 		- formatting.py — small text utilities
-    - pdf_to_json.py — utilities to convert .pdf files to .json files while maintaining the original structure of the file. Developed to work with scientific papers
+    - jutil.py — utilities to convert .pdf files to .json files while maintaining the original structure of the file. Developed to work with scientific papers
 
 # Citation
 
